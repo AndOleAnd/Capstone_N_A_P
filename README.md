@@ -1,4 +1,4 @@
-# AOA - Nairobi Ambulance Perambulation
+# Capstone_Nairobi_Ambulance_Challenge
 
 Repository for working on NF Capstone Project
 
@@ -38,7 +38,3 @@ Getting Uber movement data via commandline
   ```npm install -g npm```
 * Once that is installed:  
     ```npm install -g movement-data-toolkit```
-
-
-
-
