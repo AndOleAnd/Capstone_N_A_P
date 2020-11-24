@@ -135,5 +135,8 @@ dmypy.json
 
 
 # Do not push data to GitHub
-Inputs/
+Inputs/*.csv
+Inputs/*.geojson
+Outputs/*.csv
+Outputs/*.xls
 *.DS_Store
