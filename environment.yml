@@ -12,16 +12,18 @@ dependencies:
   - blas=1.0=mkl
   - bleach=3.2.1=py_0
   - brotlipy=0.7.0=py38h94c058a_1001
-  - ca-certificates=2020.11.8=h033912b_0
-  - certifi=2020.11.8=py38h50d1736_0
+  - ca-certificates=2020.10.14=0
+  - certifi=2020.6.20=py38_0
   - cffi=1.14.3=py38hed5b41f_0
   - chardet=3.0.4=py38h5347e94_1008
   - cryptography=3.2.1=py38h5c1d3f9_0
+  - cycler=0.10.0=py38_0
   - dbus=1.13.18=h18a8e69_0
   - decorator=4.4.2=py_0
   - defusedxml=0.6.0=py_0
   - entrypoints=0.3=py38_0
   - expat=2.2.10=hb1e8313_2
+  - freetype=2.10.4=ha233b18_0
   - gettext=0.19.8.1=h15daf44_3
   - glib=2.66.1=h9bbe63b_0
   - icu=58.2=h0a44026_3
@@ -45,13 +47,20 @@ dependencies:
   - jupyterlab=2.2.9=py_0
   - jupyterlab_pygments=0.1.2=py_0
   - jupyterlab_server=1.2.0=py_0
+  - kiwisolver=1.2.0=py38h04f5b5a_0
+  - lcms2=2.11=h92f6f08_0
   - libcxx=10.0.0=1
   - libedit=3.1.20191231=h1de35cc_1
   - libffi=3.3=hb1e8313_2
+  - libgfortran=3.0.1=h93005f0_2
   - libiconv=1.16=h1de35cc_0
   - libpng=1.6.37=ha441bb4_0
   - libsodium=1.0.18=h1de35cc_0
+  - libtiff=4.1.0=hcb84e12_1
+  - lz4-c=1.9.2=h79c402e_3
   - markupsafe=1.1.1=py38h1de35cc_1
+  - matplotlib=3.3.1=0
+  - matplotlib-base=3.3.1=py38h181983e_0
   - mistune=0.8.4=py38h1de35cc_1001
   - mkl=2019.4=233
   - mkl-service=2.3.0=py38hfbe908c_0
@@ -65,6 +74,7 @@ dependencies:
   - notebook=6.1.4=py38_0
   - numpy=1.19.1=py38h3b9f5b6_0
   - numpy-base=1.19.1=py38hcfb5961_0
+  - olefile=0.46=py_0
   - openssl=1.1.1h=haf1e3a3_0
   - packaging=20.4=py_0
   - pandas=1.1.3=py38hb1e8313_0
@@ -74,6 +84,7 @@ dependencies:
   - pcre=8.44=hb1e8313_0
   - pexpect=4.8.0=py38_1
   - pickleshare=0.7.5=py38_1001
+  - pillow=8.0.0=py38h1a82f1a_0
   - pip=20.2.4=py38_0
   - prometheus_client=0.8.0=py_0
   - prompt-toolkit=3.0.8=py_0
@@ -96,6 +107,8 @@ dependencies:
   - qtpy=1.9.0=py_0
   - readline=8.0=h1de35cc_0
   - requests=2.25.0=pyhd3deb0d_0
+  - scipy=1.5.0=py38hbab996c_0
+  - seaborn=0.11.0=py_0
   - send2trash=1.5.0=py38_0
   - setuptools=50.3.0=py38h0dc7051_1
   - sip=4.19.8=py38h0a44026_0
@@ -115,4 +128,5 @@ dependencies:
   - zeromq=4.3.3=hb1e8313_3
   - zipp=3.3.1=py_0
   - zlib=1.2.11=h1de35cc_3
+  - zstd=1.4.4=h1990bb4_3
 prefix: /opt/anaconda3/envs/nairobi_ambulance
