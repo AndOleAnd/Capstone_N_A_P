@@ -131,3 +131,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+
+
+# Do not push data to GitHub
+Inputs/*.csv
+Inputs/*.geojson
+Outputs/*.csv
+Outputs/*.xls
+*.DS_Store

@@ -2,12 +2,26 @@
 
 Repository for working on NF Capstone Project
 
+
+
 ## Challenge Details
+
 https://zindi.africa/competitions/uber-nairobi-ambulance-perambulation-challenge
 
 
 
-Getting Started:
+## Setup
+
+The input data is in the *Inputs* folder. This folder is not synchronized with GitHub. Produced outputs will go into the *Outputs* folder which is synchronized.
+
+The conda environment *nairobi_ambulance* contains:
+* jupyter 1.0.0
+* jupyterlab 2.2.9
+* pandas 1.1.3
+* seaborn 0.11.0
+
+
+
 ## Collecting data
 
 Suggested datasets:
@@ -17,7 +31,6 @@ Suggested datasets:
 4. Segment data - Detailed but unlabelled road characteristic info. 
 
 Some insights into the problem:
-
 https://kenya.ai/ai-kenya-ambulance-perambulation-datathon-highlights/
 
 Intro to the problem from Flare:
@@ -38,3 +51,6 @@ Getting Uber movement data via commandline
   ```npm install -g npm```
 * Once that is installed:  
     ```npm install -g movement-data-toolkit```
+
+
+
