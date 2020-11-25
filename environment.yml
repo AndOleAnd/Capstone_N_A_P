@@ -12,8 +12,8 @@ dependencies:
   - blas=1.0=mkl
   - bleach=3.2.1=py_0
   - brotlipy=0.7.0=py38h94c058a_1001
-  - ca-certificates=2020.10.14=0
-  - certifi=2020.6.20=py38_0
+  - ca-certificates=2020.11.8=h033912b_0
+  - certifi=2020.11.8=py38h50d1736_0
   - cffi=1.14.3=py38hed5b41f_0
   - chardet=3.0.4=py38h5347e94_1008
   - cryptography=3.2.1=py38h5c1d3f9_0
@@ -66,6 +66,8 @@ dependencies:
   - mkl-service=2.3.0=py38hfbe908c_0
   - mkl_fft=1.2.0=py38hc64f4ea_0
   - mkl_random=1.1.1=py38h959d312_0
+  - nb_conda=2.2.1=py38h32f6830_4
+  - nb_conda_kernels=2.3.0=py38h32f6830_3
   - nbclient=0.5.1=py_0
   - nbconvert=6.0.7=py38_0
   - nbformat=5.0.8=py_0
@@ -129,4 +131,4 @@ dependencies:
   - zipp=3.3.1=py_0
   - zlib=1.2.11=h1de35cc_3
   - zstd=1.4.4=h1990bb4_3
-prefix: /opt/anaconda3/envs/nairobi_ambulance
+prefix: /Users/andrewemmett/opt/anaconda3/envs/nairobi_ambulance
