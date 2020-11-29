@@ -36,34 +36,19 @@ Available data:
 * Road segment data - yet to be explored
 
 ## Deliverables
-
+Deliverable | Description
+-----|------
 Deliverable 1 | Submission to the Zindi competition
-
 Deliverable 2 | Presentation summarizing project and explaining results
-
-Deliverable 3 | Python Script 
-* Generate optimized deployment schedules that minimizes the emergency response time over all RTA's 
-* For desired time period 
-* For a given number of ambulances
-* Can handle situations were one or many ambulances arre already committed or unavailable
-
-Deliverable 4 | Visualization of crash sites and related ambulance placements
-* Format still to be determined
+Deliverable 3 | <ul><li>Python script that generates optimized deployment schedules that minimizes the emergency response time over all RTA's </li><li> For desired time period</li><li> For a given number of ambulances</li><li> Can handle situations were one or many ambulances arre already committed or unavailable</li></ul>
+Deliverable 4 | <ul><li> Visualization of crash sites and related ambulance placements (Format still to be determined) </li></ul>
 
 ## Project timeline
 
 Deadline | Milestone or tentative goal
-Week 1 |
-* First submission to Zindi competition
-* "Scope of Project"-documentation and slides for presentation covering motivation, introduction and baseline approach
-* Pseudo Code for prediction and clustering algorithm
-Week 2 |
-* Consideration set for prediction algorithms
-* Consideration set for clustering algorithms
-* A segmentation of Nairobi into geographical bins/zones
-* Submit a solution to Zindi competition that uses a clustering optimization
-Week 3 |
-* Grouped and joined all geographical data with zones
-* Use zones and their features together with time windows in a model to predict RTA's
-Week 4 |
-* something
+---------|-----------
+Week 1 | <ul><li>First submission to Zindi competition</li> <li>"Scope of Project"-documentation and slides for presentation covering motivation, introduction and baseline approach</li> <li>Pseudo Code for prediction and clustering algorithm</li></ul>
+Week 2 | <ul> <li>Consideration set for prediction algorithms</li> <li>Consideration set for clustering algorithms</li> <li>A segmentation of Nairobi into geographical bins/zones</li> <li>Submit a solution to Zindi competition that uses a clustering optimization</li> </ul>
+Week 3 | <ul> <li>Grouped and joined all geographical data with zones</li> <li>Use zones and their features together with time windows in a model to predict RTA's</li> </ul>
+Week 4 | <ul> <li>something</li> </ul>
+
