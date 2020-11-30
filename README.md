@@ -15,6 +15,7 @@ https://zindi.africa/competitions/uber-nairobi-ambulance-perambulation-challenge
 The input data is in the *Inputs* folder. This folder is not synchronized with GitHub. Produced outputs will go into the *Outputs* folder which is synchronized.
 
 The conda environment *nairobi_ambulance* contains:
+* holidays 0.10.3
 * jupyter 1.0.0
 * jupyterlab 2.2.9
 * pandas 1.1.3
