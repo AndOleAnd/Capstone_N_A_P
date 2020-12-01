@@ -16,6 +16,7 @@ dependencies:
   - certifi=2020.11.8=py38h50d1736_0
   - cffi=1.14.3=py38hed5b41f_0
   - chardet=3.0.4=py38h5347e94_1008
+  - convertdate=2.3.0=pyhd8ed1ab_0
   - cryptography=3.2.1=py38h5c1d3f9_0
   - cycler=0.10.0=py38_0
   - dbus=1.13.18=h18a8e69_0
@@ -26,6 +27,7 @@ dependencies:
   - freetype=2.10.4=ha233b18_0
   - gettext=0.19.8.1=h15daf44_3
   - glib=2.66.1=h9bbe63b_0
+  - holidays=0.10.3=pyh9f0ad1d_0
   - h3-py=3.6.4=py38h11c0d25_0
   - icu=58.2=h0a44026_3
   - idna=2.10=pyh9f0ad1d_0
@@ -50,6 +52,7 @@ dependencies:
   - jupyterlab_pygments=0.1.2=py_0
   - jupyterlab_server=1.2.0=py_0
   - kiwisolver=1.2.0=py38h04f5b5a_0
+  - korean_lunar_calendar=0.2.1=pyh9f0ad1d_0
   - lcms2=2.11=h92f6f08_0
   - libcxx=10.0.0=1
   - libedit=3.1.20191231=h1de35cc_1
@@ -97,6 +100,7 @@ dependencies:
   - ptyprocess=0.6.0=py38_0
   - pycparser=2.20=py_2
   - pygments=2.7.1=py_0
+  - pymeeus=0.3.7=pyh9f0ad1d_0
   - pyopenssl=19.1.0=py_1
   - pyparsing=2.4.7=py_0
   - pyqt=5.9.2=py38h655552a_2
