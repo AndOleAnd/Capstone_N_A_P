@@ -22,23 +22,22 @@ unavailable.
 
 ## Resources available
 Available data:
-* Historical data on RTA for the time frame of 01/2018 - 07/2019. Consists of time of the accident and latitute and longitude
-* Historical Weather data for the same time frame. Consists of one entry per day and is composed of 6 different features like precipation or humidity
-* Road segment data - yet to be explored
+* Historical data on RTA for the time frame of 01/2018 - 07/2019. Consists of time of the accident and latitute and longitude.
+* Historical Weather data for the same time frame. Consists of one entry per day and is composed of 6 different features like precipation or humidity.
+* Road segment data for some of the crash sites. Consists of the segment name and 227 obscured features.
 
 ## Deliverables
-Deliverable | Description
------|------
-Deliverable 1 | Submission to the Zindi competition
-Deliverable 2 | Presentation summarizing project and explaining results
-Deliverable 3 | <ul><li>Python script that generates optimized deployment schedules that minimizes the emergency response time over all RTA's </li><li> For desired time period</li><li> For a given number of ambulances</li><li> Can handle situations were one or many ambulances are already committed or unavailable</li></ul>
-Deliverable 4 | <ul><li> Visualization of crash sites and related ambulance placements (Format still to be determined) </li></ul>
+Deliverable   | Description
+--------------|-------------
+Deliverable 1 | Good position on leaderboard
+Deliverable 2 | Placement function API
+Deliverable 3 | Presentation of results and tool
+Deliverable 4 | Interactive visualization
 
 ## Project timeline
 Deadline | Milestone or tentative goal
----------|-----------
-Week 1 | <ul><li>First submission to Zindi competition</li> <li>"Scope of Project"-documentation and slides for presentation covering motivation, introduction and baseline approach</li> <li>Pseudo Code for prediction and clustering algorithm</li></ul>
-Week 2 | <ul> <li>(Consideration set for prediction algorithms)</li> <li>(Consideration set for clustering algorithms)</li> <li>A segmentation of Nairobi into geographical bins/zones</li> <li>Submit a solution to Zindi competition that uses a clustering optimization</li> </ul>
-Week 3 | <ul> <li>Grouped and joined all geographical data with zones</li> <li>Use zones and their features together with time windows in a model to predict RTA's</li> </ul>
-Week 4 | <ul> <li>something</li> </ul>
-
+---------|----------------------------
+Week 1 | <ul> <li>Organisational setup</li> <li>Data exploration</li> <li>Submission to Zindi</li> </ul>
+Week 2 | <ul> <li>Clustering algorithms implemented</li> <li>Regression algorithms implemented</li> </ul>
+Week 3 | <ul> <li>End-to-end pipeline</li> <li>Minimum viable product</li> <li>Expanded input data set</li> </ul>
+Week 4 | <ul> <li>Automated and optimized pipeline</li> <li>Visualization</li> <li>Presentation</li> </ul>
