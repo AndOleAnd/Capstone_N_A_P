@@ -1,4 +1,4 @@
-# Scope of Data Science project
+# Scope of Data-Science Project
 
 ## Background
 According to the Zindi Data Science competition, road traffic collisions are the number one killer of children and young adults ages 5-29, and 8th leading cause of death worldwide. 
@@ -20,11 +20,19 @@ a certain "golden" threshold value.
 The allocation algorithm for the ambulances should provide updated optimal locations in case one or many ambulances are committed to an RTA or otherwise
 unavailable.
 
-## Resources available
+## Resources Available
 Available data:
 * Historical data on RTA for the time frame of 01/2018 - 07/2019. Consists of time of the accident and latitute and longitude.
 * Historical Weather data for the same time frame. Consists of one entry per day and is composed of 6 different features like precipation or humidity.
 * Road segment data for some of the crash sites. Consists of the segment name and 227 obscured features.
+
+## Project Timeline
+Deadline | Milestone or tentative goal
+---------|----------------------------
+Week 1 | <ul> <li>Organisational setup</li> <li>Data exploration</li> <li>Submission to Zindi</li> </ul>
+Week 2 | <ul> <li>Clustering algorithms implemented</li> <li>Regression algorithms implemented</li> </ul>
+Week 3 | <ul> <li>End-to-end pipeline</li> <li>Minimum viable product</li> <li>Expanded input data set</li> </ul>
+Week 4 | <ul> <li>Automated and optimized pipeline</li> <li>Visualization</li> <li>Presentation</li> </ul>
 
 ## Deliverables
 Deliverable   | Description
@@ -33,11 +41,3 @@ Deliverable 1 | Good position on leaderboard
 Deliverable 2 | Placement function API
 Deliverable 3 | Presentation of results and tool
 Deliverable 4 | Interactive visualization
-
-## Project timeline
-Deadline | Milestone or tentative goal
----------|----------------------------
-Week 1 | <ul> <li>Organisational setup</li> <li>Data exploration</li> <li>Submission to Zindi</li> </ul>
-Week 2 | <ul> <li>Clustering algorithms implemented</li> <li>Regression algorithms implemented</li> </ul>
-Week 3 | <ul> <li>End-to-end pipeline</li> <li>Minimum viable product</li> <li>Expanded input data set</li> </ul>
-Week 4 | <ul> <li>Automated and optimized pipeline</li> <li>Visualization</li> <li>Presentation</li> </ul>
