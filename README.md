@@ -21,6 +21,7 @@ The conda environment *nairobi_ambulance* contains:
 * jupyter 1.0.0
 * jupyterlab 2.2.9
 * pandas 1.1.3
+* scikit-learn 0.23.2
 * seaborn 0.11.0
 
 
