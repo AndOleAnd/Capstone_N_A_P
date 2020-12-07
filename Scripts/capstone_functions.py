@@ -3,13 +3,15 @@ import numpy as np
 import re
 import datetime
 import math
-from sklearn.cluster import KMeans
-from sklearn.cluster import MeanShift
 import geopandas as gpd
 import h3 # h3 bins from uber
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler, minmax_scale
+from sklearn.cluster import KMeans
+from sklearn.cluster import MeanShift
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.neighbors import NearestCentroid
 import scipy.cluster.hierarchy as sch
 import holidays
 
@@ -237,7 +239,7 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
     
     # holiday_7 builds on saturday_2 and adds a new 'day' to the week for holidays
     # and a separate cluster for sundays. Total of 6 clusters
-    elif strategy == 'holiday_7':
+    elif strategy == 'holiday_6':
         if weekday == 7:
             return 'holiday'        
         elif weekday == 6:
@@ -257,6 +259,53 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
             elif time_window in ["09-12"]:
                 return 'saturday_busy'      
 
+    # has holidays but uses off peak for holidays and sundays
+    elif strategy == 'holiday_simple':
+        if weekday == 7:
+            return 'off_peak'        
+        elif weekday == 6:
+            return 'off_peak'
+        elif weekday in [0,1,2,3,4]:
+            if time_window in ["06-09"]:
+                return 'peak'
+            elif time_window in ["09-12", "12-15", "15-18", "18-21"]:
+                return 'middle'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'    
+        elif weekday == 5:
+            if time_window in ["06-09", "12-15", "15-18", "18-21"]:
+                return 'saturday_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+            elif time_window in ["09-12"]:
+                return 'saturday_busy'      
+        # has holidays but uses off peak for holidays and sundays
+
+    elif strategy == 'off_peak_split':
+        if weekday == 7:
+            if time_window in ["06-09", "09-12", "12-15", "15-18", "18-21"]:
+                return 'sunday_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+        elif weekday == 6:
+            if time_window in ["06-09", "09-12", "12-15", "15-18", "18-21"]:
+                return 'sunday_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+        elif weekday in [0,1,2,3,4]:
+            if time_window in ["06-09"]:
+                return 'peak'
+            elif time_window in ["09-12", "12-15", "15-18", "18-21"]:
+                return 'middle'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'    
+        elif weekday == 5:
+            if time_window in ["06-09", "12-15", "15-18", "18-21"]:
+                return 'saturday_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+            elif time_window in ["09-12"]:
+                return 'saturday_busy'      
     # no_cluster returns a individual cluster name for each weekday, time window and holiday combination
     elif strategy == 'no_cluster':
         return (str(weekday)+str(time_window)+str(holiday))
@@ -303,20 +352,47 @@ def create_baseline_submission_df(crash_data_df, date_start='2019-07-01', date_e
         submission_df['A'+str(ambulance)+'_Longitude'] = centroids[ambulance][1]
     return submission_df, centroids
 
+def create_cluster_centroids(crash_df_with_cluster, verbose=0, method='k_means'):
+    if method == 'k_means':
+        centroids_dict = create_k_means_centroids(crash_df_with_cluster, verbose=0)
+    elif method == 'agglomerative':
+        centroids_dict = create_AgglomerativeClustering_centroids(crash_df_with_cluster, verbose=0)
+    print(f'{len(centroids_dict)} placement sets created')
+    return centroids_dict
+    
 def create_k_means_centroids(crash_df_with_cluster, verbose=0):
+    print('using k-means clustering')
     centroids_dict = {}
     for i in crash_df_with_cluster.cluster.unique():
         kmeans = KMeans(n_clusters=6, verbose=0, tol=1e-5, max_iter=500, n_init=20 ,random_state=42)
         kmeans.fit(crash_df_with_cluster.query('cluster==@i')[['latitude','longitude']])
         centroids = kmeans.cluster_centers_
+        centroids_dict[i] = centroids.flatten()        
+        if verbose > 2:
+            plot_centroids(crash_df_with_cluster.query('cluster==@i'), centroids, cluster=i)
+        if verbose > 5:
+            print(centroids)
+    return centroids_dict
+
+def create_AgglomerativeClustering_centroids(crash_df_with_cluster, verbose=0):
+    print('using agglomerative clustering')
+    centroids_dict = {}   
+    for i in crash_df_with_cluster.cluster.unique():
+        data_slice = crash_df_with_cluster.query('cluster==@i')
+        hc = AgglomerativeClustering(n_clusters = 6, affinity = 'euclidean', linkage = 'ward')
+        y_predict = hc.fit_predict(data_slice[['latitude','longitude']])
+        clf = NearestCentroid()
+        clf.fit(data_slice[['latitude','longitude']], y_predict)
+        
+        centroids = clf.centroids_
         centroids_dict[i] = centroids.flatten()
         if verbose > 2:
             plot_centroids(crash_df_with_cluster.query('cluster==@i'), centroids, cluster=i)
         if verbose > 5:
             print(centroids)
-    print(f'{len(centroids_dict)} centroids created')
     return centroids_dict
-        
+
+
 def centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01', tw_cluster_strategy='baseline'):
     '''Takes dictionary of clusters and centroids and creates a data frame in the format needed for submission'''
 
@@ -336,10 +412,10 @@ def centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='20
     print('submission dataframe created')
     return submission_df
 
-def create_submission_csv(submission_df, crash_source, outlier_filter, tw_cluster_strategy, model_name, path='../Outputs/'):
+def create_submission_csv(submission_df, crash_source, outlier_filter, tw_cluster_strategy, placement_method, path='../Outputs/'):
     '''Takes dataframe in submission format and outputs a csv file with matching name'''
     current_time = datetime.datetime.now()
-    filename = f'{current_time.year}{current_time.month}{current_time.day}_{crash_source}_{outlier_filter}_{tw_cluster_strategy}_{model_name}.csv'
+    filename = f'{current_time.year}{current_time.month}{current_time.day}_{crash_source}_{outlier_filter}_{tw_cluster_strategy}_{placement_method}.csv'
     submission_df.to_csv(path+filename,index=False)
     print(f'{filename} saved in {path}') 
     
@@ -349,7 +425,7 @@ def score(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_
     '''
     Can be used to score the ambulance placements against a set of crashes. Can be used on all crash data, train_df or holdout_df as crash_df.
     '''
-    test_df = crash_df.loc[(crash_df.datetime > test_start_date) & (crash_df.datetime < test_end_date)]
+    test_df = crash_df.loc[(crash_df.datetime >= test_start_date) & (crash_df.datetime <= test_end_date)]
     print(f'Data points in test period: {test_df.shape[0]}' )
     total_distance = 0
     for crash_date, c_lat, c_lon in test_df[['datetime', 'latitude', 'longitude']].values:
@@ -367,7 +443,7 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
                                  outlier_filter=0,
                                  holdout_strategy='year_2019', holdout_test_size=0.3,
                                  test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
-                                 tw_cluster_strategy='saturday_2', placement_model='k_means', verbose=0):  
+                                 tw_cluster_strategy='saturday_2', placement_method='k_means', verbose=0):  
     '''
     load crash data (from train or prediction) and apply feautre engineering, run tw clustering (based on strategy choice) 
     create ambulance placements, create output file.
@@ -384,8 +460,9 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     train_df = outlier_removal(train_df, filter=outlier_filter)
     # apply time window cluster labels to df based on strategy specified
     train_df = create_cluster_feature(train_df, strategy=tw_cluster_strategy, verbose=verbose)
-    # Run k-means clustering to get placement set centroids for each TW cluster
-    centroids_dict = create_k_means_centroids(train_df, verbose=verbose)
+    # Run clustering model to get placement set centroids for each TW cluster
+    centroids_dict = create_cluster_centroids(train_df, verbose=0, method=placement_method)
+
     # create df in format needed for submission
     train_placements_df = centroid_to_submission(centroids_dict, date_start='2018-01-01', date_end='2019-12-31',
                                                  tw_cluster_strategy=tw_cluster_strategy)
@@ -404,11 +481,11 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
                                            tw_cluster_strategy=tw_cluster_strategy)
     create_submission_csv(submission_df, crash_source=crash_source_csv, outlier_filter=outlier_filter,
-                          tw_cluster_strategy=tw_cluster_strategy, model_name=placement_model, path=output_path)
+                          tw_cluster_strategy=tw_cluster_strategy, placement_method=placement_method, path=output_path)
 
-# Call pipeline function!
+# Call pipeline function! Best results so far:
 '''ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/', crash_source_csv='Train',
-                             outlier_filter=0.00, 
-                             holdout_strategy='random', holdout_test_size=0.1,
+                             outlier_filter=0.005, 
+                             holdout_strategy='random', holdout_test_size=0.2,
                              test_period_date_start='2018-01-01', test_period_date_end='2019-12-31',
-                             tw_cluster_strategy='holiday_7', placement_model='k-means', verbose=2)'''
+                             tw_cluster_strategy='off_peak_split', placement_method='k_means', verbose=2)'''
