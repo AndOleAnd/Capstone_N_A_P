@@ -430,9 +430,10 @@ def create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=0,
                 loss.backward() # Calc grads
                 amb_locs.data -= lr * amb_locs.grad.data # Update locs
                 amb_locs.grad = None # Reset gradients for next step
-                train_losses.append(loss.item())
-                val_loss = loss_fn(val_locs, amb_locs)
-                val_losses.append(val_loss.item()) # Can remove as this slows things down
+                train_losses.append(loss.item())                
+                if verbose > 9:
+                    val_loss = loss_fn(val_locs, amb_locs)
+                    val_losses.append(val_loss.item()) # Can remove as this slows things down
             if verbose > 5 and epoch % 100  == 0: # show progress
                 print(f'Val loss: {val_loss.item()}')
         centroids = amb_locs.detach().numpy()
