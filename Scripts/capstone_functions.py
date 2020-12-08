@@ -238,7 +238,7 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
             elif time_window in ["09-12"]:
                 return 'saturday_busy'    
     
-    # holiday_7 builds on saturday_2 and adds a new 'day' to the week for holidays
+    # holiday_6 builds on saturday_2 and adds a new 'day' to the week for holidays
     # and a separate cluster for sundays. Total of 6 clusters
     elif strategy == 'holiday_6':
         if weekday == 7:
@@ -565,10 +565,10 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
 
 # Call pipeline function! Best results so far:
 '''
-ambulance_placement_pipeline(input_path='', output_path='', crash_source_csv='Train',
+ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/', crash_source_csv='Train',
                              outlier_filter=0.005, 
-                             holdout_strategy='random', holdout_test_size=0.05,
+                             holdout_strategy='random', holdout_test_size=0.005,
                              test_period_date_start='2018-01-01', test_period_date_end='2019-12-31',
-                             tw_cluster_strategy='off_peak_split', placement_method='gradient_descent', verbose=10,
-                             lr=3e-2, n_epochs=800)
+                             tw_cluster_strategy='holiday_simple', placement_method='gradient_descent', verbose=0,
+                             lr=3e-3, n_epochs=400)
 '''
