@@ -1,5 +1,6 @@
 name: nairobi_ambulance
 channels:
+  - fastai
   - conda-forge
   - anaconda
   - defaults
@@ -13,7 +14,7 @@ dependencies:
   - bleach=3.2.1=py_0
   - brotlipy=0.7.0=py38h94c058a_1001
   - ca-certificates=2020.11.8=h033912b_0
-  - certifi=2020.11.8=py38h50d1736_0
+  - certifi=2020.11.8=py38hecd8cb5_0
   - cffi=1.14.3=py38hed5b41f_0
   - chardet=3.0.4=py38h5347e94_1008
   - convertdate=2.3.0=pyhd8ed1ab_0
@@ -24,6 +25,7 @@ dependencies:
   - defusedxml=0.6.0=py_0
   - entrypoints=0.3=py38_0
   - expat=2.2.10=hb1e8313_2
+  - fastcore=1.3.10=py_0
   - freetype=2.10.4=ha233b18_0
   - gettext=0.19.8.1=h15daf44_3
   - glib=2.66.1=h9bbe63b_0
@@ -141,12 +143,31 @@ dependencies:
   - zlib=1.2.11=h1de35cc_3
   - zstd=1.4.4=h1990bb4_3
   - pip:
+    - blis==0.7.4
+    - catalogue==1.0.0
     - click==7.1.2
     - click-plugins==1.1.1
     - cligj==0.7.1
+    - cymem==2.0.5
+    - dataclasses==0.6
+    - fastai==2.1.8
+    - fastprogress==1.0.0
     - fiona==1.8.18
+    - future==0.18.2
     - geopandas==0.8.1
     - munch==2.5.0
+    - murmurhash==1.0.5
+    - plac==1.1.3
+    - preshed==3.0.5
     - pyproj==3.0.0.post1
+    - pyyaml==5.3.1
     - shapely==1.7.1
+    - spacy==2.3.4
+    - srsly==1.0.5
+    - thinc==7.4.3
+    - torch==1.7.0
+    - torchvision==0.8.1
+    - tqdm==4.54.1
+    - typing-extensions==3.7.4.3
+    - wasabi==0.8.0
 prefix: /Users/andrewemmett/opt/anaconda3/envs/nairobi_ambulance
