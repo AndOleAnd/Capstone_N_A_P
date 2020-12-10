@@ -17,7 +17,6 @@ import holidays
 from fastai.vision.all import * # Needs latest version, and sometimes a restart of the runtime after the pip installs
 from sklearn_extra.cluster import KMedoids
 
-
 def create_crash_df(train_file = '../Inputs/Train.csv'):  
     '''
     loads crash data from input folder into dataframe
