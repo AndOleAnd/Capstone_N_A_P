@@ -84,15 +84,35 @@ def split_accident_df(data, strategy, test_size=0.3, random_state=42):
         
     return data_train, data_test
 
-def outlier_removal(crash_df, filter=0.05):
-    '''filters top and bottom quantiles of data based on filter input'''
-    crash_df = crash_df.loc[crash_df['latitude'] < crash_df['latitude'].quantile(1-filter)]
-    crash_df = crash_df.loc[crash_df['latitude'] > crash_df['latitude'].quantile(filter)]
-    crash_df = crash_df.loc[crash_df['longitude'] < crash_df['longitude'].quantile(1-filter)]
-    crash_df = crash_df.loc[crash_df['longitude'] > crash_df['longitude'].quantile(filter)]
+def outlier_removal(crash_df, filter=0.00):
+
+    if filter == 'hex_bin':
+        crash_df = assign_hex_bin(crash_df)
+        hex_bin_filter =  ['867a45067ffffff', '867a45077ffffff', '867a4511fffffff',
+                           '867a4512fffffff', '867a45147ffffff', '867a4515fffffff',
+                           '867a45177ffffff', '867a45817ffffff', '867a4584fffffff',
+                           '867a4585fffffff', '867a458dfffffff', '867a458f7ffffff',
+                           '867a45a8fffffff', '867a45b0fffffff', '867a45b17ffffff',
+                           '867a45b67ffffff', '867a45b77ffffff', '867a6141fffffff',
+                           '867a614d7ffffff', '867a616b7ffffff', '867a6304fffffff',
+                           '867a632a7ffffff', '867a63307ffffff', '867a6331fffffff',
+                           '867a6360fffffff', '867a63667ffffff', '867a6396fffffff',
+                           '867a656c7ffffff', '867a65797ffffff', '867a6e18fffffff',
+                           '867a6e1b7ffffff', '867a6e4c7ffffff', '867a6e517ffffff',
+                           '867a6e59fffffff', '867a6e5a7ffffff', '867a6e5b7ffffff',
+                           '867a6e657ffffff', '867a6e737ffffff', '867a6e797ffffff',
+                           '867a6e79fffffff', '867a6e7b7ffffff', '867a6ecf7ffffff',
+                           '867a6ed47ffffff', '867a6ed97ffffff', '867a6eda7ffffff' ]
+        crash_df = crash_df.loc[~crash_df['h3_zone_6'].isin(hex_bin_filter)]
+    else: 
+        '''filters top and bottom quantiles of data based on filter input'''
+        crash_df = crash_df.loc[crash_df['latitude'] < crash_df['latitude'].quantile(1-filter)]
+        crash_df = crash_df.loc[crash_df['latitude'] > crash_df['latitude'].quantile(filter)]
+        crash_df = crash_df.loc[crash_df['longitude'] < crash_df['longitude'].quantile(1-filter)]
+        crash_df = crash_df.loc[crash_df['longitude'] > crash_df['longitude'].quantile(filter)]
     return crash_df
 
-def assign_hex_bin(df,lat_column="latitude",lon_column="longitude", ):
+def assign_hex_bin(df,lat_column="latitude",lon_column="longitude"):
     '''
     Takes lat,lon and creates column with h3 bin name for three levels of granualirity.
     '''
@@ -351,13 +371,13 @@ def create_baseline_submission_df(crash_data_df, date_start='2019-07-01', date_e
         submission_df['A'+str(ambulance)+'_Longitude'] = centroids[ambulance][1]
     return submission_df, centroids
 
-def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='k_means', lr=3e-3, n_epochs=400):
+def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='k_means', lr=3e-2, n_epochs=400, batch_size=50):
     if method == 'k_means':
         centroids_dict = create_k_means_centroids(crash_df_with_cluster, verbose=verbose)
     elif method == 'agglomerative':
         centroids_dict = create_AgglomerativeClustering_centroids(crash_df_with_cluster, verbose=verbose)
     elif method == 'gradient_descent':
-        centroids_dict = create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=verbose)
+        centroids_dict = create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=verbose, lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     elif method == 'k_medoids':
         centroids_dict = create_k_medoids_centroids(crash_df_with_cluster, verbose=verbose)
     if verbose > 0:    
@@ -431,7 +451,7 @@ def create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=0,
         batches = DataLoader(train_locs, batch_size=batch_size, shuffle=True)
 
         # Set up ambulance locations
-        amb_locs = torch.randn(6, 2) * 0.08
+        amb_locs = torch.randn(6, 2) * 0.04
         amb_locs = amb_locs + tensor(-1.27, 36.85)
         amb_locs.requires_grad_()
                 
@@ -545,7 +565,7 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
                                  holdout_strategy='year_2019', holdout_test_size=0.3,
                                  test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
                                  tw_cluster_strategy='saturday_2', placement_method='k_means', verbose=0,
-                                 lr=3e-2, n_epochs=800):  
+                                 lr=3e-2, n_epochs=400, batch_size=50):  
     '''
     load crash data (from train or prediction) and apply feautre engineering, run tw clustering (based on strategy choice) 
     create ambulance placements, create output file.
@@ -558,13 +578,15 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     # split data into train and test sets
     train_df, test_df = split_accident_df(data=crash_df, strategy=holdout_strategy,
                                           test_size=holdout_test_size)
+    
     # remove outliers from test set based on lat and lon
     train_df = outlier_removal(train_df, filter=outlier_filter)
     # apply time window cluster labels to df based on strategy specified
     train_df = create_cluster_feature(train_df, strategy=tw_cluster_strategy, verbose=verbose)
     # Run clustering model to get placement set centroids for each TW cluster
     test_df_with_clusters = create_cluster_feature(test_df, strategy=tw_cluster_strategy, verbose=0)
-    centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters, verbose=verbose, method=placement_method)
+    centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters, verbose=verbose, method=placement_method,
+                                             lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     
 
     # create df in format needed for submission
