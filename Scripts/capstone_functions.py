@@ -193,6 +193,7 @@ def calculate_TW_cluster(crash_df, method='MeanShift', verbose=0):
     
     crash_df = crash_df.merge(clustered_time_buckets[['time_window_str', 'weekday','cluster']],
                               how='left', on=['time_window_str', 'weekday'])
+
     return crash_df
 
 def plot_TW_cluster(clustered_time_buckets):
