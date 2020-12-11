@@ -167,7 +167,7 @@ def calculate_TW_cluster(crash_df, method='MeanShift', verbose=0):
     if verbose > 1:
         plot_TW_cluster(clustered_time_buckets)
     
-    print('cash_df before merge')
+    print('crash_df before merge')
     display(crash_df.head())
     print('clustered_time_buckets before merge')
     display(clustered_time_buckets.head())
