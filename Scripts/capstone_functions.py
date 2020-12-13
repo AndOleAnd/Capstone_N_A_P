@@ -326,6 +326,34 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
                 return 'off_peak'
             elif time_window in ["09-12"]:
                 return 'saturday_busy'      
+
+    # Weekend_day is an attempt to improve based on the loss scores of the model
+    elif strategy == 'weekend_day':
+        if weekday == 7:
+            if time_window in ["06-09", "09-12", "12-15", "15-18", "18-21"]:
+                return 'weekend_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+        elif weekday == 6:
+            if time_window in ["06-09", "09-12", "12-15", "15-18", "18-21"]:
+                return 'weekend_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+        elif weekday in [0,1,2,3,4]:
+            if time_window in ["06-09"]:
+                return 'peak'
+            elif time_window in ["09-12", "12-15", "15-18", "18-21"]:
+                return 'busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'    
+        elif weekday == 5:
+            if time_window in ["06-09", "12-15", "15-18", "18-21"]:
+                return 'weekend_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+            elif time_window in ["09-12"]:
+                return 'weekend_busy'     
+            
     # no_cluster returns a individual cluster name for each weekday, time window and holiday combination
     elif strategy == 'no_cluster':
         return (str(weekday)+str(time_window)+str(holiday))
@@ -461,7 +489,7 @@ def create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=0,
         batches = DataLoader(train_locs, batch_size=batch_size, shuffle=True)
 
         # Set up ambulance locations
-        amb_locs = torch.randn(6, 2)
+        amb_locs = torch.randn(6, 2)*.5
         amb_locs = amb_locs + tensor(data_slice.latitude.mean(), data_slice.longitude.mean())
         amb_locs.requires_grad_()
                 
