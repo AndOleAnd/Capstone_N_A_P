@@ -17,6 +17,142 @@ import holidays
 from fastai.vision.all import * # Needs latest version, and sometimes a restart of the runtime after the pip installs
 from sklearn_extra.cluster import KMedoids
 
+
+
+def clean_weather_data(df_weather):
+    '''
+    Fills the missing information by looking at the previous and the following existing values
+    and then incrementaly distributing the difference over the missing days.
+    This guarantees a smooth development of the weather data over time.
+    '''
+    
+    missing = df_weather[pd.isnull(df_weather).any(1)].index
+    
+    if len(missing) > 0:
+        for col in df_weather.columns[1:]:
+            before = df_weather.loc[missing[0]-1, col]
+            after = df_weather.loc[missing[-1]+1, col]
+            diff = after - before
+            for i in range(len(missing)):
+                df_weather.loc[missing[i], col] = before+diff/(len(missing)+1)*(i+1)
+                
+    return df_weather
+
+
+
+def add_weather_change(df_weather):
+    df_weather["change_water_atmosphere"] = 0
+    df_weather["change_temperature"] = 0
+    for row in range(df_weather.shape[0]):
+        if row == 0:
+            df_weather.loc[row, "change_water_atmosphere"] = 0
+            df_weather.loc[row, "change_temperature"] = 0
+        else:
+            df_weather.loc[row, "change_water_atmosphere"] = df_weather.loc[row, "precipitable_water_entire_atmosphere"] - df_weather.loc[row-1, "precipitable_water_entire_atmosphere"]
+            df_weather.loc[row, "change_temperature"] = df_weather.loc[row, "temperature_2m_above_ground"] - df_weather.loc[row-1, "temperature_2m_above_ground"]
+    return df_weather
+
+
+
+def join_accident_to_weather(df_accident, df_weather):
+    '''
+    Left-joins the accident data to the weather data, resulting in a dataframe containing the weather information
+    for every day as well as the aggregated accidents.
+    '''
+    
+    # Count accidents per day and leftjoin to weather dataframe
+    df_accident["date"] = df_accident["datetime"].apply(lambda x: x.date())
+    if type(df_weather.loc[0, "Date"]) is not datetime.date:
+        df_weather["Date"] = df_weather["Date"].apply(lambda x: x.date())
+    accident_count = df_accident.groupby("date").count()["uid"].reset_index()
+    df_combined = df_weather.merge(accident_count[["date", "uid"]], left_on="Date", right_on="date", how='left')
+    
+    # Fill NaNs with zeros
+    df_combined.fillna(value=0, inplace=True)
+        
+    # Drop duplicate Date column
+    df_combined.drop("date", axis=1, inplace=True)
+    
+    # Rename column
+    df_combined.rename(columns={"Date":"date", "uid":"accidents"}, inplace=True)
+    
+    # Adding column with 1 for sundays and holidays, 0 for working days
+    df_combined["sun_holiday"] = df_combined["date"].apply(lambda x: 1 if (x.weekday() == 6) or (x in holidays.Kenya()) else 0)
+    
+    # Change type to integer
+    df_combined["accidents"] = df_combined["accidents"].astype("int")
+    
+    return df_combined
+
+
+
+def scale_pca_weather(df_combined):
+    '''
+    Scaling and analysing the principal components of the weather data.
+    '''
+    
+    # Scaling
+    mm_scaler = MinMaxScaler()
+    X_mm = df_combined[["precipitable_water_entire_atmosphere", "relative_humidity_2m_above_ground",
+                        "specific_humidity_2m_above_ground", "temperature_2m_above_ground"]]
+    X_mm_scaled = mm_scaler.fit_transform(X_mm)
+
+    std_scaler = StandardScaler()
+    X_std = df_combined[["u_component_of_wind_10m_above_ground", "v_component_of_wind_10m_above_ground",
+                         "change_water_atmosphere", "change_temperature"]]
+    X_std_scaled = std_scaler.fit_transform(X_std)
+
+    X_scaled = pd.DataFrame(np.concatenate((X_mm_scaled, X_std_scaled), axis=1), columns=["precipitable_water_entire_atmosphere", "relative_humidity_2m_above_ground",
+                              "specific_humidity_2m_above_ground", "temperature_2m_above_ground", "u_component_of_wind_10m_above_ground", "v_component_of_wind_10m_above_ground",
+                               "change_water_atmosphere", "change_temperature"])
+    
+    # Principal componant analysis (PCA)
+    pca = PCA(n_components=0.99)
+    pca_decomposition = pca.fit(X_scaled)
+    X_pca = pca_decomposition.transform(X_scaled)
+    df_combined_pca = pd.DataFrame(X_pca)
+    df_combined_pca = df_combined_pca.join(df_combined[["date", "accidents", "sun_holiday"]])
+    
+    return df_combined_pca
+
+
+
+def split_combined(df_combined_pca):
+    X_train = df_combined_pca[df_combined_pca["date"] < datetime.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+    y_train = df_combined_pca[df_combined_pca["date"] < datetime.date(2019, 7, 1)]["accidents"]
+    X_test = df_combined_pca[(df_combined_pca["date"] >= datetime.date(2019, 7, 1)) & (df_combined_pca["date"] < datetime.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
+    
+    return X_train, X_test, y_train
+
+
+
+def predict_poly(X_train, X_test, y_train):
+    poly = PolynomialFeatures(degree=4)
+    X_train_poly = poly.fit_transform(X_train.drop("sun_holiday", axis=1))
+    lin_poly = LinearRegression()
+    lin_poly.fit(X_train_poly, y_train)
+    X_test_poly = poly.transform(X_test.drop("sun_holiday", axis=1))
+
+    return lin_poly.predict(X_test_poly)
+    
+
+
+def predict_accidents_on_weather(df_accident, df_weather):
+    '''
+    Takes the raw data and returns the number of predicted road traffic accidents for every day in the second half of 2019.
+    '''
+    
+    df_weather = clean_weather_data(df_weather)
+    df_weather = add_weather_change(df_weather)
+    df_combined = join_accident_to_weather(df_accident, df_weather)
+    df_combined_pca = scale_pca_weather(df_combined)
+    X_train, X_test, y_train = split_combined(df_combined_pca)
+    y_pred = predict_poly(X_train, X_test, y_train)
+    y_pred = [0 if i < 0 else i for i in y_pred]
+    return y_pred
+
+
+
 def create_crash_df(train_file = '../Inputs/Train.csv'):  
     '''
     loads crash data from input folder into dataframe
