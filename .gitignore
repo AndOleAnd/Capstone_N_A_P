@@ -140,6 +140,7 @@ dmypy.json
 Inputs/*.csv
 Inputs/*.geojson
 Inputs/*.zip
+Inputs/map
 Outputs/*.csv
 Outputs/*.xls
 Inputs/*.json
