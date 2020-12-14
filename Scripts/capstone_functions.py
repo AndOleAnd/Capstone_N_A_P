@@ -462,6 +462,34 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
                 return 'off_peak'
             elif time_window in ["09-12"]:
                 return 'saturday_busy'      
+
+    # Weekend_day is an attempt to improve based on the loss scores of the model
+    elif strategy == 'weekend_day':
+        if weekday == 7:
+            if time_window in ["06-09", "09-12", "12-15", "15-18", "18-21"]:
+                return 'weekend_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+        elif weekday == 6:
+            if time_window in ["06-09", "09-12", "12-15", "15-18", "18-21"]:
+                return 'weekend_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+        elif weekday in [0,1,2,3,4]:
+            if time_window in ["06-09"]:
+                return 'peak'
+            elif time_window in ["09-12", "12-15", "15-18", "18-21"]:
+                return 'busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'    
+        elif weekday == 5:
+            if time_window in ["06-09", "12-15", "15-18", "18-21"]:
+                return 'weekend_busy'
+            elif time_window in ["00-03", "03-06", "21-24"]:
+                return 'off_peak'
+            elif time_window in ["09-12"]:
+                return 'weekend_busy'     
+            
     # no_cluster returns a individual cluster name for each weekday, time window and holiday combination
     elif strategy == 'no_cluster':
         return (str(weekday)+str(time_window)+str(holiday))
@@ -514,7 +542,8 @@ def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='
     elif method == 'agglomerative':
         centroids_dict = create_AgglomerativeClustering_centroids(crash_df_with_cluster, verbose=verbose)
     elif method == 'gradient_descent':
-        centroids_dict = create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=verbose, lr=lr, n_epochs=n_epochs, batch_size=batch_size)
+        centroids_dict = create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=verbose,
+                                                           lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     elif method == 'k_medoids':
         centroids_dict = create_k_medoids_centroids(crash_df_with_cluster, verbose=verbose)
     if verbose > 0:    
@@ -568,19 +597,27 @@ def create_AgglomerativeClustering_centroids(crash_df_with_cluster, verbose=0):
         
         centroids = clf.centroids_
         centroids_dict[i] = centroids.flatten()
-        if verbose > 2:
-            plot_centroids(data_slice, centroids, cluster=i)
         if verbose > 5:
+            plot_centroids(data_slice, centroids, cluster=i)
+        if verbose > 14:
             print(centroids)
     return centroids_dict
 
 def create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=0, lr=3e-3, n_epochs=400, batch_size=50):
     if verbose > 0:    
         print('using gradient descent clustering')
+    
+    # Copy dataframes and standardize lat lon values on train and test set
+    scaler = StandardScaler()
+    crash_df_scaled = crash_df_with_cluster.copy()
+    test_df_scaled = test_df.copy()
+    crash_df_scaled[['latitude', 'longitude']] = scaler.fit_transform(crash_df_scaled[['latitude', 'longitude']])
+    test_df_scaled[['latitude', 'longitude']] = scaler.transform(test_df_scaled[['latitude', 'longitude']])
+    
     centroids_dict = {}   
-    for i in crash_df_with_cluster.cluster.unique():
-        data_slice = crash_df_with_cluster.query('cluster==@i')
-        test_slice = test_df.query('cluster==@i')
+    for i in crash_df_scaled.cluster.unique():
+        data_slice = crash_df_scaled.query('cluster==@i')
+        test_slice = test_df_scaled.query('cluster==@i')
         train_locs = tensor(data_slice[['latitude', 'longitude']].values) # To Tensor
         val_locs = tensor(test_slice[['latitude', 'longitude']].values) # To Tensor
         
@@ -588,8 +625,8 @@ def create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=0,
         batches = DataLoader(train_locs, batch_size=batch_size, shuffle=True)
 
         # Set up ambulance locations
-        amb_locs = torch.randn(6, 2) * 0.04
-        amb_locs = amb_locs + tensor(-1.27, 36.85)
+        amb_locs = torch.randn(6, 2)*.5
+        amb_locs = amb_locs + tensor(data_slice.latitude.mean(), data_slice.longitude.mean())
         amb_locs.requires_grad_()
                 
         # Set vars
@@ -609,25 +646,29 @@ def create_gradient_descent_centroids(crash_df_with_cluster, test_df, verbose=0,
                 amb_locs.data -= lr * amb_locs.grad.data # Update locs
                 amb_locs.grad = None # Reset gradients for next step
                 train_losses.append(loss.item())                
-                if verbose > 9:
+                if verbose > 2:
                     val_loss = loss_fn(val_locs, amb_locs)
                     val_losses.append(val_loss.item()) # Can remove as this slows things down
-            if verbose > 5 and epoch % 100  == 0: # show progress
-                print(f'Val loss: {val_loss.item()}')
-        centroids = amb_locs.detach().numpy()
-        centroids_dict[i] = amb_locs.detach().numpy().flatten()
+            if verbose > 2 and epoch % 100  == 0: # show progress
+                print(f'Val loss for cluster {i}: {val_loss.item()}')
         
+        centroids = amb_locs.detach().numpy()
+
         #show output
-        if verbose > 2:
-            plot_centroids(data_slice, centroids, cluster=i)
         if verbose > 5:
+            plot_centroids(data_slice, centroids, cluster=i)
+        if verbose > 14:
             print(centroids) 
         if verbose > 9:
             plt.figure(num=None, figsize=(16, 10), dpi=80, facecolor='w', edgecolor='k')
             plt.plot(train_losses, label='train_loss')
             plt.plot(val_losses, c='red', label='val loss')
             plt.legend()
-    
+        
+        #scale back to lat lon
+        centroids = scaler.inverse_transform(centroids)
+        centroids_dict[i] = centroids.flatten()
+        
     return centroids_dict
 
 def loss_fn(crash_locs, amb_locs):
