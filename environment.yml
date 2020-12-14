@@ -119,6 +119,7 @@ dependencies:
   - readline=8.0=h1de35cc_0
   - requests=2.25.0=pyhd3deb0d_0
   - scikit-learn=0.23.2=py38h959d312_0
+  - scikit-learn-extra=0.1.0b2=py38h65ad66c_0
   - scipy=1.5.0=py38hbab996c_0
   - seaborn=0.11.0=py_0
   - send2trash=1.5.0=py38_0
@@ -170,4 +171,5 @@ dependencies:
     - tqdm==4.54.1
     - typing-extensions==3.7.4.3
     - wasabi==0.8.0
+    - xmltodict==0.12.0
 prefix: /Users/andrewemmett/opt/anaconda3/envs/nairobi_ambulance
