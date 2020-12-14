@@ -751,6 +751,13 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     '''
     # load crash data into dataframe
     crash_df = create_crash_df(train_file = input_path+crash_source_csv+'.csv')
+    
+    # in case of loading file with hex bins instead of lat/long
+    if 'latitude' not in crash_df.columns:
+        crash_df['latitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[0])
+        crash_df['longitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[1])  
+        crash_df = crash_df.drop("hex_bin", axis=1)
+
     # create individual date and time features from date column
     crash_df = create_temporal_features(crash_df)
     # split data into train and test sets
