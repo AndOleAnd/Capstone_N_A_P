@@ -258,14 +258,14 @@ def assign_hex_bin(df,lat_column="latitude",lon_column="longitude", hexbin_resol
     df["h3_zone_{}".format(hexbin_resolution)] = df.apply(lambda x: h3.geo_to_h3(x[lat_column], x[lon_column], hexbin_resolution),axis=1)
     return df
 
-def plot_centroids(crash_data_df, centroids, cluster='cluster'):
+def plot_centroids(crash_data_df, centroids, cluster='cluster', labels = 'b'):
     '''
     plots the crash data points from crash_data_df and overlays the ambulance location from centroids. 
     Can be used in a loop by giving 'cluster' value as a parameter to label the chart with the cluster name.
     '''
     
     fig, axs = plt.subplots(figsize=(8, 5))
-    plt.scatter(x = crash_data_df['longitude'], y=crash_data_df['latitude'], s=1, label='Crash locations' )
+    plt.scatter(x = crash_data_df['longitude'], y=crash_data_df['latitude'], s=1, label='Crash locations', c=labels )
     plt.scatter(x = centroids[:,1], y=centroids[:,0], marker="x",
                 color='r',label='Ambulances locations',s=100)
     axs.set_title('Scatter plot : Ambulaces locations vs Crash locations :'+cluster)
@@ -559,10 +559,11 @@ def create_k_means_centroids(crash_df_with_cluster, verbose=0):
         data_slice = crash_df_with_cluster.query('cluster==@i')
         kmeans = KMeans(n_clusters=6, verbose=0, tol=1e-5, max_iter=500, n_init=20 ,random_state=42)
         kmeans.fit(data_slice[['latitude','longitude']])
+        labels = kmeans.labels_
         centroids = kmeans.cluster_centers_
         centroids_dict[i] = centroids.flatten()        
         if verbose > 2:
-            plot_centroids(data_slice, centroids, cluster=i)
+            plot_centroids(data_slice, centroids, cluster=i, labels=labels)
         if verbose > 5:
             print(centroids)
     return centroids_dict
@@ -575,10 +576,11 @@ def create_k_medoids_centroids(crash_df_with_cluster, verbose=0):
         data_slice = crash_df_with_cluster.query('cluster==@i')
         kmedoids = KMedoids(n_clusters=6, init='k-medoids++', max_iter=500, random_state=42)
         kmedoids.fit(data_slice[['latitude','longitude']])
+        labels = kmedoids.labels_
         centroids = kmedoids.cluster_centers_
         centroids_dict[i] = centroids.flatten()        
         if verbose > 2:
-            plot_centroids(data_slice, centroids, cluster=i)
+            plot_centroids(data_slice, centroids, cluster=i, labels=labels)
         if verbose > 5:
             print(centroids)
     return centroids_dict
@@ -712,7 +714,7 @@ def centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='20
 def create_submission_csv(submission_df, crash_source, outlier_filter, tw_cluster_strategy, placement_method, path='../Outputs/', verbose=0):
     '''Takes dataframe in submission format and outputs a csv file with matching name'''
     # current_time = dt.datetime.now()
-    current_time = dt.now()
+    current_time = dt.datetime.now()
     filename = f'{current_time.year}{current_time.month}{current_time.day}_{crash_source}_{outlier_filter}_{tw_cluster_strategy}_{placement_method}.csv'
     submission_df.to_csv(path+filename,index=False)
     if verbose > 0:
@@ -797,7 +799,7 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
                                            tw_cluster_strategy=tw_cluster_strategy)
     create_submission_csv(submission_df, crash_source=crash_source_csv, outlier_filter=outlier_filter,
-                          tw_cluster_strategy=tw_cluster_strategy, placement_method=placement_method, path=output_path)
+                          tw_cluster_strategy=tw_cluster_strategy, placement_method=placement_method, path=output_path ,verbose=verbose)
 
     
     
