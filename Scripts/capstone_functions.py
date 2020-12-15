@@ -1,17 +1,20 @@
 import pandas as pd
 import numpy as np
 import re
-import datetime
+import datetime as dt
 import math
 import geopandas as gpd
 import h3 # h3 bins from uber
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler, minmax_scale
+from sklearn.preprocessing import StandardScaler, minmax_scale, MinMaxScaler
 from sklearn.cluster import KMeans
 from sklearn.cluster import MeanShift
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.neighbors import NearestCentroid
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 import scipy.cluster.hierarchy as sch
 import holidays
 from fastai.vision.all import * # Needs latest version, and sometimes a restart of the runtime after the pip installs
@@ -62,7 +65,7 @@ def join_accident_to_weather(df_accident, df_weather):
     
     # Count accidents per day and leftjoin to weather dataframe
     df_accident["date"] = df_accident["datetime"].apply(lambda x: x.date())
-    if type(df_weather.loc[0, "Date"]) is not datetime.date:
+    if type(df_weather.loc[0, "Date"]) is not dt.date:
         df_weather["Date"] = df_weather["Date"].apply(lambda x: x.date())
     accident_count = df_accident.groupby("date").count()["uid"].reset_index()
     df_combined = df_weather.merge(accident_count[["date", "uid"]], left_on="Date", right_on="date", how='left')
@@ -118,9 +121,9 @@ def scale_pca_weather(df_combined):
 
 
 def split_combined(df_combined_pca):
-    X_train = df_combined_pca[df_combined_pca["date"] < datetime.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
-    y_train = df_combined_pca[df_combined_pca["date"] < datetime.date(2019, 7, 1)]["accidents"]
-    X_test = df_combined_pca[(df_combined_pca["date"] >= datetime.date(2019, 7, 1)) & (df_combined_pca["date"] < datetime.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
+    X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+    y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)]["accidents"]
+    X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 7, 1)) & (df_combined_pca["date"] < dt.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
     
     return X_train, X_test, y_train
 
@@ -667,8 +670,8 @@ def centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='20
 
 def create_submission_csv(submission_df, crash_source, outlier_filter, tw_cluster_strategy, placement_method, path='../Outputs/', verbose=0):
     '''Takes dataframe in submission format and outputs a csv file with matching name'''
-    # current_time = datetime.datetime.now()
-    current_time = datetime.now()
+    # current_time = dt.datetime.now()
+    current_time = dt.now()
     filename = f'{current_time.year}{current_time.month}{current_time.day}_{crash_source}_{outlier_filter}_{tw_cluster_strategy}_{placement_method}.csv'
     submission_df.to_csv(path+filename,index=False)
     if verbose > 0:
@@ -753,6 +756,15 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     
 ### Prediction functions from here on
 
+def convert_h3_to_lat_lon(df):
+    """
+    Convert hex bins back to latitude and longitude
+    """
+    df['latitude'] = df.hex_bins.apply(lambda x: h3.h3_to_geo(x)[0])
+    df['longitude'] = df.hex_bins.apply(lambda x: h3.h3_to_geo(x)[1])  
+    df = df.drop("hex_bins", axis=1)
+    return df
+
 def create_pred_template(df):
     '''Based on hex bin resolution creates an empty data frame for each 3 hour time window for each hex bin.
      This results in a n * 2 dataframe (columns: time_windows, hex_bins) where number of rows equals hex_bins * 4369.
@@ -807,16 +819,19 @@ def generate_outlier_list(df, frequency_cutoff=1):
     """
     Based on the minimum frequency of occurrence, cut off all hex bins that do not exceed that value over 1.5 years. Returns list of hex bins to exclude.
     """
-    df_outliers = df.groupby("hex_bins")
-    df_outliers = df_outliers.agg({'RTA': np.count_nonzero})
-    df_outliers = df_outliers.reset_index()
-    df_outliers.columns = ["hex_bins", "RTA_nonzero"]
-    df_freq_outliers = df_outliers.loc[df_outliers["RTA_nonzero"] <= frequency_cutoff]
-    
-    # Get list of frequency outliers
-    list_freq_outliers = list(df_freq_outliers["hex_bins"].values)
-    
-    return list_freq_outliers
+    if frequency_cutoff == 0:
+        return []
+    else:
+        df_outliers = df.groupby("hex_bins")
+        df_outliers = df_outliers.agg({'RTA': np.count_nonzero})
+        df_outliers = df_outliers.reset_index()
+        df_outliers.columns = ["hex_bins", "RTA_nonzero"]
+        df_freq_outliers = df_outliers.loc[df_outliers["RTA_nonzero"] <= frequency_cutoff]
+
+        # Get list of frequency outliers
+        list_freq_outliers = list(df_freq_outliers["hex_bins"].values)
+
+        return list_freq_outliers
 
 def filter_df_for_pred_a(df, list_freq_outliers):
     """
@@ -826,6 +841,7 @@ def filter_df_for_pred_a(df, list_freq_outliers):
     df_pred_a = df_pred_a.reset_index()
     df_pred_a = df_pred_a.drop(["uid", "latitude", "longitude", "time", "time_window", "time_window_str", "day", "weekday", "month", "half_year", "rainy_season",
                                 "year", "date_trunc", "holiday", "time_window_key", "index"], axis=1)
+    df_pred_a.columns = ["datetime", "hex_bins"]
     return df_pred_a
 
 def filter_df_for_pred_b(df_merged, list_freq_outliers):
@@ -1048,10 +1064,11 @@ def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1):
         df_weather = pd.read_csv('../Inputs/Weather_Nairobi_Daily_GFS.csv', parse_dates=['Date'])
         df_raw = create_crash_df()
         
-        predicted_rta = [12, 23, 11, 15, 9 , 18, 19, 22, 9, 7, 15, 16, 17, 8, 9, 19]
+        predicted_rta = predict_accidents_on_weather(df_raw, df_weather)
+        predicted_rta_round = [int(round(i, 0)) for i in predicted_rta]
         #predicted_rta = predict_accidents_on_weather(df_raw, df_weather)
         
-        df_pred_c = generate_predictions(df_samples, predicted_rta)
+        df_pred_c = generate_predictions(df_samples, predicted_rta_round)
         
         df_pred_c_clean = reduce_to_time_windows(df_pred_c)
         
