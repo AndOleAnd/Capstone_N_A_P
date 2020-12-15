@@ -13,8 +13,8 @@ dependencies:
   - blas=1.0=mkl
   - bleach=3.2.1=py_0
   - brotlipy=0.7.0=py38h94c058a_1001
-  - ca-certificates=2020.11.8=h033912b_0
-  - certifi=2020.11.8=py38hecd8cb5_0
+  - ca-certificates=2020.12.5=h033912b_0
+  - certifi=2020.12.5=py38h50d1736_0
   - cffi=1.14.3=py38hed5b41f_0
   - chardet=3.0.4=py38h5347e94_1008
   - convertdate=2.3.0=pyhd8ed1ab_0
@@ -27,6 +27,8 @@ dependencies:
   - expat=2.2.10=hb1e8313_2
   - fastcore=1.3.10=py_0
   - freetype=2.10.4=ha233b18_0
+  - geographiclib=1.50=py_0
+  - geopy=2.0.0=pyh9f0ad1d_0
   - gettext=0.19.8.1=h15daf44_3
   - glib=2.66.1=h9bbe63b_0
   - h3-py=3.6.4=py38h11c0d25_0
@@ -85,7 +87,7 @@ dependencies:
   - numpy=1.19.1=py38h3b9f5b6_0
   - numpy-base=1.19.1=py38hcfb5961_0
   - olefile=0.46=py_0
-  - openssl=1.1.1h=haf1e3a3_0
+  - openssl=1.1.1i=h35c211d_0
   - packaging=20.4=py_0
   - pandas=1.1.3=py38hb1e8313_0
   - pandoc=2.11=h0dc7051_0
