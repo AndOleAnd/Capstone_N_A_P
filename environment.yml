@@ -1,10 +1,11 @@
 name: nairobi_ambulance
 channels:
   - fastai
-  - conda-forge
   - anaconda
+  - conda-forge
   - defaults
 dependencies:
+  - amply=0.1.4=py_0
   - appnope=0.1.0=py38_1001
   - argon2-cffi=20.1.0=py38haf1e3a3_1
   - async_generator=1.10=py_0
@@ -17,12 +18,14 @@ dependencies:
   - certifi=2020.12.5=py38h50d1736_0
   - cffi=1.14.3=py38hed5b41f_0
   - chardet=3.0.4=py38h5347e94_1008
+  - coincbc=2.10.3=h7a5a08d_3
   - convertdate=2.3.0=pyhd8ed1ab_0
   - cryptography=3.2.1=py38h5c1d3f9_0
   - cycler=0.10.0=py38_0
   - dbus=1.13.18=h18a8e69_0
   - decorator=4.4.2=py_0
   - defusedxml=0.6.0=py_0
+  - docutils=0.16=py38h50d1736_2
   - entrypoints=0.3=py38_0
   - expat=2.2.10=hb1e8313_2
   - fastcore=1.3.10=py_0
@@ -57,11 +60,14 @@ dependencies:
   - kiwisolver=1.2.0=py38h04f5b5a_0
   - korean_lunar_calendar=0.2.1=pyh9f0ad1d_0
   - lcms2=2.11=h92f6f08_0
+  - libblas=3.8.0=14_mkl
+  - libcblas=3.8.0=14_mkl
   - libcxx=10.0.0=1
   - libedit=3.1.20191231=h1de35cc_1
   - libffi=3.3=hb1e8313_2
   - libgfortran=3.0.1=h93005f0_2
   - libiconv=1.16=h1de35cc_0
+  - liblapack=3.8.0=14_mkl
   - libpng=1.6.37=ha441bb4_0
   - libsodium=1.0.18=h1de35cc_0
   - libtiff=4.1.0=hcb84e12_1
@@ -145,25 +151,32 @@ dependencies:
   - zlib=1.2.11=h1de35cc_3
   - zstd=1.4.4=h1990bb4_3
   - pip:
+    - affine==2.3.0
     - blis==0.7.4
     - catalogue==1.0.0
     - click==7.1.2
     - click-plugins==1.1.1
     - cligj==0.7.1
+    - contextily==1.0.1
     - cymem==2.0.5
     - dataclasses==0.6
     - fastai==2.1.8
     - fastprogress==1.0.0
     - fiona==1.8.18
     - future==0.18.2
+    - geographiclib==1.50
     - geopandas==0.8.1
+    - geopy==2.0.0
+    - mercantile==1.1.6
     - munch==2.5.0
     - murmurhash==1.0.5
     - plac==1.1.3
     - preshed==3.0.5
     - pyproj==3.0.0.post1
     - pyyaml==5.3.1
+    - rasterio==1.1.8
     - shapely==1.7.1
+    - snuggs==1.4.7
     - spacy==2.3.4
     - srsly==1.0.5
     - thinc==7.4.3
