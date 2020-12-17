@@ -496,6 +496,9 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
     # no_cluster returns a individual cluster name for each weekday, time window and holiday combination
     elif strategy == 'no_cluster':
         return (str(weekday)+str(time_window)+str(holiday))
+    
+    elif strategy == 'time_window':
+        return time_window
             
 def create_cluster_feature(crash_df, strategy='baseline', verbose=0):
     '''
