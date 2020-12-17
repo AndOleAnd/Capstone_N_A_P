@@ -722,7 +722,8 @@ def create_submission_csv(submission_df, crash_source, outlier_filter, tw_cluste
 def score(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_date='2019-12-31', verbose=0):
           
     '''
-    Can be used to score the ambulance placements against a set of crashes. Can be used on all crash data, train_df or holdout_df as crash_df.
+    Can be used to score the ambulance placements against a set of crashes. 
+    Can be used on all crash data, train_df or holdout_df as crash_df.
     '''
     test_df = crash_df.loc[(crash_df.datetime >= test_start_date) & (crash_df.datetime <= test_end_date)]
     if verbose > 0:    
@@ -740,15 +741,13 @@ def score(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_
 
 
 def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/', crash_source_csv='Train',
-                                 outlier_filter=0,
-                                 holdout_strategy='year_2019', holdout_test_size=0.3,
+                                 outlier_filter=0, holdout_strategy='year_2019', holdout_test_size=0.3,
                                  test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
                                  tw_cluster_strategy='saturday_2', placement_method='k_means', verbose=0,
                                  lr=3e-2, n_epochs=400, batch_size=50):  
     '''
     load crash data (from train or prediction) and apply feautre engineering, run tw clustering (based on strategy choice) 
     create ambulance placements, create output file.
-    placement_model has no impact on functions but is used to add info to output file
     '''
     # load crash data into dataframe
     crash_df = create_crash_df(train_file = input_path+crash_source_csv+'.csv')
@@ -1227,13 +1226,14 @@ ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/',
 '''
 
 
-def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0, test_period_date_start='2019-07-01', test_period_date_end='2019-12-01',
-                                     tw_cluster_strategy='baseline', placement_method='k_means', verbose=0,
-                                     lr=3e-2, n_epochs=400, batch_size=50):  
+def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0, 
+                  test_period_date_start='2019-07-01', test_period_date_end='2019-12-01',
+                  tw_cluster_strategy='baseline', placement_method='k_means', verbose=0,
+                  lr=3e-2, n_epochs=400, batch_size=50):  
     '''
-    load crash data (from train or prediction) and apply feautre engineering, run tw clustering (based on strategy choice) 
+    load crash data (from prediction) and apply feautre engineering, 
+    run tw clustering (based on strategy choice) 
     create ambulance placements, create output file.
-    placement_model has no impact on functions but is used to add info to output file
     '''
     
     # load predicted crash data into dataframe
@@ -1256,10 +1256,12 @@ def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0
     train_df = outlier_removal(train_df, filter=outlier_filter)
     # apply time window cluster labels to df based on strategy specified
     train_df = create_cluster_feature(train_df, strategy=tw_cluster_strategy, verbose=verbose)
+
     # Run clustering model to get placement set centroids for each TW cluster
     test_df_with_clusters = create_cluster_feature(test_df, strategy=tw_cluster_strategy, verbose=0)
-    centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters, verbose=verbose, method=placement_method,
-                                             lr=lr, n_epochs=n_epochs, batch_size=batch_size)
+    centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters,
+                                              verbose=verbose, method=placement_method,
+                                              lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     
     # create df in format needed for submission
     train_placements_df = centroid_to_submission(centroids_dict, date_start='2019-01-01', date_end='2020-01-01',
@@ -1276,9 +1278,10 @@ def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0
         print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')  
         print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
 
-    # Create file for submitting to zindi
+    # Create df for submitting to zindi
     submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
                                            tw_cluster_strategy=tw_cluster_strategy)
+    # Create file for submitting to zindi
     create_submission_csv(submission_df, crash_source='prediction', outlier_filter=outlier_filter,
                           tw_cluster_strategy=tw_cluster_strategy, placement_method=placement_method, path='../Outputs/' ,verbose=verbose)
 
