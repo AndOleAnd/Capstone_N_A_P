@@ -1227,7 +1227,7 @@ ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/',
 '''
 
 
-def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0, test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
+def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0, test_period_date_start='2019-07-01', test_period_date_end='2019-12-01',
                                      tw_cluster_strategy='baseline', placement_method='k_means', verbose=0,
                                      lr=3e-2, n_epochs=400, batch_size=50):  
     '''
@@ -1238,13 +1238,12 @@ def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0
     
     # load predicted crash data into dataframe
     crash_df = rta_prediction_pipeline(type_of_pred="c", frequency_cutoff=frequency_cutoff, predict_period=predict_period)
-    
     # in case of loading file with hex bins instead of lat/long
     if 'latitude' not in crash_df.columns:
         crash_df['latitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[0])
         crash_df['longitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[1])  
         crash_df.drop("hex_bins", axis=1, inplace=True)
-
+    
     # create train dataset from predictions for 2019
     crash_df = create_temporal_features(crash_df)
     train_df = crash_df
@@ -1263,21 +1262,18 @@ def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0
                                              lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     
     # create df in format needed for submission
-    train_placements_df = centroid_to_submission(centroids_dict, date_start='2018-01-01', date_end='2019-12-31',
+    train_placements_df = centroid_to_submission(centroids_dict, date_start='2019-01-01', date_end='2020-01-01',
                                                  tw_cluster_strategy=tw_cluster_strategy)
-    
     # Run scoring functions
     if verbose > 0:    
-        print(f'Total size of test set: {test_df.shape[0]}')
+        print(f'Total size of test set: {test_df.shape[0]}') 
+        print(f'Total size of train set: {crash_df.shape[0]}')
     test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
                        test_end_date=test_period_date_end)
-    if verbose > 0:    
-        print(f'Total size of train set: {crash_df.shape[0]}')
     train_score = score(train_placements_df,train_df,
                         test_start_date=test_period_date_start, test_end_date=test_period_date_end)
     if verbose > 0:    
-        print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')
-    if verbose > 0:    
+        print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')  
         print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
 
     # Create file for submitting to zindi
