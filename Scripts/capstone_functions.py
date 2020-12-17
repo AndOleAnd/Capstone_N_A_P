@@ -127,6 +127,12 @@ def split_combined(df_combined_pca):
     
     return X_train, X_test, y_train
 
+def split_combined_first_half_2019(df_combined_pca):
+    X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+    y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)]["accidents"]
+    X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 1, 1)) & (df_combined_pca["date"] < dt.date(2019, 7, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
+    
+    return X_train, X_test, y_train
 
 
 def predict_poly(X_train, X_test, y_train):
@@ -139,6 +145,19 @@ def predict_poly(X_train, X_test, y_train):
     return lin_poly.predict(X_test_poly)
     
 
+def predict_accidents_on_weather_first_half_2019(df_accident, df_weather):
+    '''
+    Takes the raw data and returns the number of predicted road traffic accidents for every day in the second half of 2019.
+    '''
+    
+    df_weather = clean_weather_data(df_weather)
+    df_weather = add_weather_change(df_weather)
+    df_combined = join_accident_to_weather(df_accident, df_weather)
+    df_combined_pca = scale_pca_weather(df_combined)
+    X_train, X_test, y_train = split_combined_first_half_2019(df_combined_pca)
+    y_pred = predict_poly(X_train, X_test, y_train)
+    y_pred = [0 if i < 0 else i for i in y_pred]
+    return y_pred
 
 def predict_accidents_on_weather(df_accident, df_weather):
     '''
@@ -982,6 +1001,91 @@ def generate_predictions(df, predicted_rta):
         tuesday_bins.append(list(*[df_tuesday["hex_bins"][0:lst_tue[i]]]))
         tuesday_tw.append(list(*[df_tuesday["time_window"][0:lst_tue[i]]]))
     for i in range(len(lst_wed)):
+        wednesday_bins.append(list(*[df_wednesday["hex_bins"][0:lst_wed[i]]]))
+        wednesday_tw.append(list(*[df_wednesday["time_window"][0:lst_wed[i]]]))
+        thursday_bins.append(list(*[df_thursday["hex_bins"][0:lst_thu[i]]]))
+        thursday_tw.append(list(*[df_thursday["time_window"][0:lst_thu[i]]]))
+        friday_bins.append(list(*[df_friday["hex_bins"][0:lst_fri[i]]]))
+        friday_tw.append(list(*[df_friday["time_window"][0:lst_fri[i]]]))
+        saturday_bins.append(list(*[df_saturday["hex_bins"][0:lst_sat[i]]]))
+        saturday_tw.append(list(*[df_saturday["time_window"][0:lst_sat[i]]]))
+        sunday_bins.append(list(*[df_sunday["hex_bins"][0:lst_sun[i]]]))
+        sunday_tw.append(list(*[df_sunday["time_window"][0:lst_sun[i]]]))    
+    
+    
+    # Turn list of lists into an overall list for each weekday's predictions
+    flat_monday_bins = [item for sublist in monday_bins for item in sublist]
+    flat_monday_tw = [item for sublist in monday_tw for item in sublist]
+    flat_tuesday_bins = [item for sublist in tuesday_bins for item in sublist]
+    flat_tuesday_tw = [item for sublist in tuesday_tw for item in sublist]
+    flat_wednesday_bins = [item for sublist in wednesday_bins for item in sublist]
+    flat_wednesday_tw = [item for sublist in wednesday_tw for item in sublist]
+    flat_thursday_bins = [item for sublist in thursday_bins for item in sublist]
+    flat_thursday_tw = [item for sublist in thursday_tw for item in sublist]
+    flat_friday_bins = [item for sublist in friday_bins for item in sublist]
+    flat_friday_tw = [item for sublist in friday_tw for item in sublist]
+    flat_saturday_bins = [item for sublist in saturday_bins for item in sublist]
+    flat_saturday_tw = [item for sublist in saturday_tw for item in sublist]
+    flat_sunday_bins = [item for sublist in sunday_bins for item in sublist]
+    flat_sunday_tw = [item for sublist in sunday_tw for item in sublist]
+    
+    # Generate list with hex bins and time windows as input for prediction
+    flat_bins = flat_monday_bins + flat_tuesday_bins + flat_wednesday_bins + flat_thursday_bins + flat_friday_bins + flat_saturday_bins + flat_sunday_bins
+    flat_tw = flat_monday_tw + flat_tuesday_tw + flat_wednesday_tw + flat_thursday_tw + flat_friday_tw + flat_saturday_tw + flat_sunday_tw
+
+    # Generate list with day of the week entries for each prediction as input for dataframe
+    weekdays = [0] * sum(lst_mon) + [1] * sum(lst_tue) + [2] * sum(lst_wed) + [3] * sum(lst_thu) + [4] * sum(lst_fri) + [5] * sum(lst_sat) + [6] * sum(lst_sun)
+    
+    # Generate list with week entries for each prediction as input for dataframe
+    list_of_days_list = [lst_mon, lst_tue, lst_wed, lst_thu, lst_fri, lst_sat, lst_sun]
+    lst_weeks = []
+    for lst_days in list_of_days_list:
+        i = 0
+        for number in lst_days:
+            lst_weeks += [i] * number
+            i += 1
+    
+    # Create dataframe
+    df_pred_c = pd.DataFrame(list(zip(flat_bins, flat_tw, weekdays, lst_weeks)), columns=["hex_bins", "time_window", "weekday", "week"])
+    
+    return df_pred_c
+
+def generate_predictions_first_half_2019(df, predicted_rta):
+    """
+    Takes a dataframe containing the RTA frequency per weekday and time window and the predicted RTA's per day and turns this into a prediction dataframe.
+    """
+
+    df_monday = df.loc[df["weekday"] == 0].sort_values(by="RTA_freq", ascending=False)
+    df_tuesday = df.loc[df["weekday"] == 1].sort_values(by="RTA_freq", ascending=False)
+    df_wednesday = df.loc[df["weekday"] == 2].sort_values(by="RTA_freq", ascending=False)
+    df_thursday = df.loc[df["weekday"] == 3].sort_values(by="RTA_freq", ascending=False)
+    df_friday = df.loc[df["weekday"] == 4].sort_values(by="RTA_freq", ascending=False)
+    df_saturday = df.loc[df["weekday"] == 5].sort_values(by="RTA_freq", ascending=False)
+    df_sunday = df.loc[df["weekday"] == 6].sort_values(by="RTA_freq", ascending=False)
+    
+    # Split overall predictions into predictions per weekday
+    lst_mon = predicted_rta[6::7]
+    lst_tue = predicted_rta[0::7]
+    lst_wed = predicted_rta[1::7]
+    lst_thu = predicted_rta[2::7]
+    lst_fri = predicted_rta[3::7]
+    lst_sat = predicted_rta[4::7]
+    lst_sun = predicted_rta[5::7]
+    
+    # The evaluation period 2019-07-01 to 2019-12-31 conveniently starts with a Monday but end with a Tuesday - hence the loop has to run 
+    # one iteration more for Monday and Tuesday.
+    # This generates a list of lists of predictions for each weekday
+
+    monday_bins = tuesday_bins = wednesday_bins = thursday_bins = friday_bins = saturday_bins = sunday_bins = []
+    monday_tw = tuesday_tw = wednesday_tw = thursday_tw = friday_tw = saturday_tw = sunday_tw = []
+    
+    for i in range(len(lst_mon)):
+        monday_bins.append(list(*[df_monday["hex_bins"][0:lst_mon[i]]]))
+        monday_tw.append(list(*[df_monday["time_window"][0:lst_mon[i]]]))
+
+    for i in range(len(lst_wed)):
+        tuesday_bins.append(list(*[df_tuesday["hex_bins"][0:lst_tue[i]]]))
+        tuesday_tw.append(list(*[df_tuesday["time_window"][0:lst_tue[i]]]))
         wednesday_bins.append(list(*[df_wednesday["hex_bins"][0:lst_wed[i]]]))
         wednesday_tw.append(list(*[df_wednesday["time_window"][0:lst_wed[i]]]))
         thursday_bins.append(list(*[df_thursday["hex_bins"][0:lst_thu[i]]]))
