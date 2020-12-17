@@ -143,5 +143,7 @@ Inputs/*.zip
 Inputs/map
 Outputs/*.csv
 Outputs/*.xls
+Outputs/*.gif
+Images/*.*
 Inputs/*.json
 *.DS_Store
