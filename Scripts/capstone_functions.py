@@ -514,27 +514,6 @@ def create_cluster_feature(crash_df, strategy='baseline', verbose=0):
     return crash_df
             
 
-def create_baseline_submission_df(crash_data_df, date_start='2019-07-01', date_end='2020-01-01'):
-    '''Takes crash data and creates star shaped placement set, outputs a data frame in the format needed for submission'''
-       
-    # star grid
-    lat_centroid = list(crash_data_df.latitude.quantile(q=[1/5,2/5,3/5,4/5]))
-    lon_centroid = list(crash_data_df.longitude.quantile(q=[1/4,2/4,3/4]))
-    centroids=[(lat_centroid[1],lon_centroid[0]),(lat_centroid[2],lon_centroid[0]),
-               (lat_centroid[0],lon_centroid[1]),(lat_centroid[3],lon_centroid[1]),
-               (lat_centroid[1],lon_centroid[2]),(lat_centroid[2],lon_centroid[2])]
-    
-    # Create Date range covering submission period set
-    dates = pd.date_range(date_start, date_end, freq='3h')
-        
-    # Create submission dataframe
-    submission_df = pd.DataFrame({'date':dates})
-    for ambulance in range(6):
-        # Place an ambulance in the center of the city:
-        submission_df['A'+str(ambulance)+'_Latitude'] = centroids[ambulance][0]
-        submission_df['A'+str(ambulance)+'_Longitude'] = centroids[ambulance][1]
-    return submission_df, centroids
-
 def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='k_means', lr=3e-2, n_epochs=400, batch_size=50):
     if method == 'k_means':
         centroids_dict = create_k_means_centroids(crash_df_with_cluster, verbose=verbose)
@@ -545,9 +524,32 @@ def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='
                                                            lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     elif method == 'k_medoids':
         centroids_dict = create_k_medoids_centroids(crash_df_with_cluster, verbose=verbose)
+    
+    elif method == 'baseline':
+        centroids_dict = create_baseline_centroids(crash_df_with_cluster, verbose=verbose)
+    
     if verbose > 0:    
         print(f'{len(centroids_dict)} placement sets created')
+    
     return centroids_dict
+    
+
+def create_baseline_centroids(crash_df_with_cluster, verbose=0):
+    if verbose > 0:    
+        print('using star grid for placement')
+    centroids_dict = {}
+    for i in crash_df_with_cluster.cluster.unique():
+        data_slice = crash_df_with_cluster.query('cluster==@i')
+        lat_centroid = list(data_slice.latitude.quantile(q=[1/5,2/5,3/5,4/5]))
+        lon_centroid = list(data_slice.longitude.quantile(q=[1/4,2/4,3/4]))
+        centroids=[(lat_centroid[1],lon_centroid[0]),(lat_centroid[2],lon_centroid[0]),
+               (lat_centroid[0],lon_centroid[1]),(lat_centroid[3],lon_centroid[1]),
+               (lat_centroid[1],lon_centroid[2]),(lat_centroid[2],lon_centroid[2])]
+        centroids_dict[i] = np.array(centroids).flatten()          
+        if verbose > 5:
+            print(centroids)
+    return centroids_dict
+
     
 def create_k_means_centroids(crash_df_with_cluster, verbose=0):
     if verbose > 0:    
