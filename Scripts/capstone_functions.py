@@ -118,20 +118,15 @@ def scale_pca_weather(df_combined):
     
     return df_combined_pca
 
-
-
-def split_combined(df_combined_pca):
-    X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
-    y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)]["accidents"]
-    X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 7, 1)) & (df_combined_pca["date"] < dt.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
-    
-    return X_train, X_test, y_train
-
-def split_combined_first_half_2019(df_combined_pca):
-    X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
-    y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)]["accidents"]
-    X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 1, 1)) & (df_combined_pca["date"] < dt.date(2019, 7, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
-    
+def split_combined(df_combined_pca, predict_period='2019_h2'):
+    if predict_period == '2019_h1':
+        X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+        y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)]["accidents"]
+        X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 1, 1)) & (df_combined_pca["date"] < dt.date(2019, 7, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
+    elif predict_period == '2019_h2':
+        X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+        y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)]["accidents"]
+        X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 7, 1)) & (df_combined_pca["date"] < dt.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
     return X_train, X_test, y_train
 
 
@@ -145,30 +140,18 @@ def predict_poly(X_train, X_test, y_train):
     return lin_poly.predict(X_test_poly)
     
 
-def predict_accidents_on_weather_first_half_2019(df_accident, df_weather):
+def predict_accidents_on_weather(df_accident, df_weather, predict_period='2019_h1'):
     '''
-    Takes the raw data and returns the number of predicted road traffic accidents for every day in the second half of 2019.
-    '''
-    
-    df_weather = clean_weather_data(df_weather)
-    df_weather = add_weather_change(df_weather)
-    df_combined = join_accident_to_weather(df_accident, df_weather)
-    df_combined_pca = scale_pca_weather(df_combined)
-    X_train, X_test, y_train = split_combined_first_half_2019(df_combined_pca)
-    y_pred = predict_poly(X_train, X_test, y_train)
-    y_pred = [0 if i < 0 else i for i in y_pred]
-    return y_pred
-
-def predict_accidents_on_weather(df_accident, df_weather):
-    '''
-    Takes the raw data and returns the number of predicted road traffic accidents for every day in the second half of 2019.
+    Takes the raw data and returns the number of predicted road traffic accidents for every day in the predict period:
+    First half 2019 : (predict_period='2019_h1') 
+    Second half of 2019 : (predict_period='2019_h2') 
     '''
     
     df_weather = clean_weather_data(df_weather)
     df_weather = add_weather_change(df_weather)
     df_combined = join_accident_to_weather(df_accident, df_weather)
     df_combined_pca = scale_pca_weather(df_combined)
-    X_train, X_test, y_train = split_combined(df_combined_pca)
+    X_train, X_test, y_train = split_combined(df_combined_pca, predict_period=predict_period)
     y_pred = predict_poly(X_train, X_test, y_train)
     y_pred = [0 if i < 0 else i for i in y_pred]
     return y_pred
@@ -1170,7 +1153,7 @@ def export_df_to_csv(df,path_file='../Inputs/train_h3.csv'):
     df.to_csv(path_file,index=False)
     print(f'file created {path_file}') 
 
-def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1):
+def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1, predict_period='2019_h1'):
     """
     Choose type of prediction:
         - 'a' for a simple frequency outlier removal based on parameter 'frequency_cutoff'. Outputs data for 2018-01-01 to 2019-06-30.
@@ -1218,11 +1201,13 @@ def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1):
         df_weather = pd.read_csv('../Inputs/Weather_Nairobi_Daily_GFS.csv', parse_dates=['Date'])
         df_raw = create_crash_df()
         
-        predicted_rta = predict_accidents_on_weather(df_raw, df_weather)
+        predicted_rta = predict_accidents_on_weather(df_raw, df_weather, predict_period=predict_period)
         predicted_rta_round = [int(round(i, 0)) for i in predicted_rta]
         #predicted_rta = predict_accidents_on_weather(df_raw, df_weather)
-        
-        df_pred_c = generate_predictions(df_samples, predicted_rta_round)
+        if predict_period == '2019_h2':
+            df_pred_c = generate_predictions(df_samples, predicted_rta_round)
+        elif predict_period == '2019_h1':
+            df_pred_c = generate_predictions_first_half_2019(df_samples, predicted_rta_round)
         
         df_pred_c_clean = reduce_to_time_windows(df_pred_c)
         
