@@ -502,11 +502,7 @@ def create_cluster_feature(crash_df, strategy='baseline', verbose=0):
     Function takes crash df and creates new column with tw cluster labels.
     If verbose is increased, the time window clusters will be visualised.
     '''
-    crash_df["cluster"] = crash_df.apply(lambda x: 
-                                         assign_TW_cluster(weekday=x.weekday,
-                                                           time_window=x.time_window_str,
-                                                           strategy=strategy) 
-                                         ,axis=1)
+    crash_df['cluster'] = crash_df.apply(lambda x: assign_TW_cluster(weekday=x.weekday, time_window=x.time_window_str, strategy=strategy) ,axis=1)
     if verbose > 0:    
         print(f'{crash_df.cluster.nunique()} clusters created')
     if verbose > 1:
@@ -756,13 +752,11 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     '''
     # load crash data into dataframe
     crash_df = create_crash_df(train_file = input_path+crash_source_csv+'.csv')
-    
     # in case of loading file with hex bins instead of lat/long
     if 'latitude' not in crash_df.columns:
         crash_df['latitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[0])
         crash_df['longitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[1])  
-        crash_df = crash_df.drop("hex_bin", axis=1)
-
+        crash_df.drop("hex_bins", axis=1, inplace=True)
     # create individual date and time features from date column
     crash_df = create_temporal_features(crash_df)
     # split data into train and test sets
@@ -778,7 +772,6 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters, verbose=verbose, method=placement_method,
                                              lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     
-
     # create df in format needed for submission
     train_placements_df = centroid_to_submission(centroids_dict, date_start='2018-01-01', date_end='2019-12-31',
                                                  tw_cluster_strategy=tw_cluster_strategy)
@@ -1118,13 +1111,16 @@ def generate_predictions_first_half_2019(df, predicted_rta):
     
     return df_pred_c
 
-def reduce_to_time_windows(df):
+def reduce_to_time_windows(df, predict_period):
     """
     Takes a data frame of predicted RTA's and brings it into the correct format for clustering.
     """
     
     # Set start of prediction period
-    start = pd.to_datetime("2019-07-01")
+    if predict_period == '2019_h2':
+        start = pd.to_datetime("2019-07-01")
+    if predict_period == '2019_h1':
+        start = pd.to_datetime("2019-01-01")
     
     # Creates a datetime column that counts the days upwards and then sets all entries to the starting day, 2019-07-01, plus that day
     df["help"] = (df["week"]) * 7 + df["weekday"]
@@ -1138,10 +1134,15 @@ def reduce_to_time_windows(df):
     df.loc[df["time_window"] == "12-15", "datetime"] = df["datetime"] + pd.Timedelta(hours=12, minutes=1)
     df.loc[df["time_window"] == "15-18", "datetime"] = df["datetime"] + pd.Timedelta(hours=15, minutes=1)
     df.loc[df["time_window"] == "18-21", "datetime"] = df["datetime"] + pd.Timedelta(hours=18, minutes=1)
-    df.loc[df["time_window"] == "21-00", "datetime"] = df["datetime"] + pd.Timedelta(hours=21, minutes=1)
+    df.loc[df["time_window"] == "21-24", "datetime"] = df["datetime"] + pd.Timedelta(hours=21, minutes=1)
     
     # Remove redundant columns
     df_pred_c_clean = df.drop(["time_window", "weekday", "week", "help"], axis=1)
+    
+    df_pred_c_clean = df_pred_c_clean.sort_values(by="datetime")
+    
+    if predict_period=="2019_h1":
+        df_pred_c_clean = df_pred_c_clean.loc[df_pred_c_clean["datetime"] < "2019-7-1"]
     
     return df_pred_c_clean
 
@@ -1209,7 +1210,7 @@ def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1, predict_period
         elif predict_period == '2019_h1':
             df_pred_c = generate_predictions_first_half_2019(df_samples, predicted_rta_round)
         
-        df_pred_c_clean = reduce_to_time_windows(df_pred_c)
+        df_pred_c_clean = reduce_to_time_windows(df_pred_c, predict_period)
         
         export_df_to_csv(df_pred_c_clean,path_file='../Inputs/predictions_for_clustering_c.csv')
         
@@ -1224,3 +1225,66 @@ ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/',
                              tw_cluster_strategy='holiday_simple', placement_method='gradient_descent', verbose=0,
                              lr=3e-3, n_epochs=400)
 '''
+
+
+def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0, test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
+                                     tw_cluster_strategy='baseline', placement_method='k_means', verbose=0,
+                                     lr=3e-2, n_epochs=400, batch_size=50):  
+    '''
+    load crash data (from train or prediction) and apply feautre engineering, run tw clustering (based on strategy choice) 
+    create ambulance placements, create output file.
+    placement_model has no impact on functions but is used to add info to output file
+    '''
+    
+    # load predicted crash data into dataframe
+    crash_df = rta_prediction_pipeline(type_of_pred="c", frequency_cutoff=frequency_cutoff, predict_period=predict_period)
+    
+    # in case of loading file with hex bins instead of lat/long
+    if 'latitude' not in crash_df.columns:
+        crash_df['latitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[0])
+        crash_df['longitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[1])  
+        crash_df.drop("hex_bins", axis=1, inplace=True)
+
+    # create train dataset from predictions for 2019
+    crash_df = create_temporal_features(crash_df)
+    train_df = crash_df
+    # create test dataset from actual 2019
+    test_df = create_crash_df(train_file = '../Inputs/Train.csv')
+    test_df = test_df.loc[test_df["datetime"] >= "2019-01-01"]
+    test_df = create_temporal_features(test_df)
+    
+    # remove outliers from test set based on lat and lon
+    train_df = outlier_removal(train_df, filter=outlier_filter)
+    # apply time window cluster labels to df based on strategy specified
+    train_df = create_cluster_feature(train_df, strategy=tw_cluster_strategy, verbose=verbose)
+    # Run clustering model to get placement set centroids for each TW cluster
+    test_df_with_clusters = create_cluster_feature(test_df, strategy=tw_cluster_strategy, verbose=0)
+    centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters, verbose=verbose, method=placement_method,
+                                             lr=lr, n_epochs=n_epochs, batch_size=batch_size)
+    
+    # create df in format needed for submission
+    train_placements_df = centroid_to_submission(centroids_dict, date_start='2018-01-01', date_end='2019-12-31',
+                                                 tw_cluster_strategy=tw_cluster_strategy)
+    
+    # Run scoring functions
+    if verbose > 0:    
+        print(f'Total size of test set: {test_df.shape[0]}')
+    test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
+                       test_end_date=test_period_date_end)
+    if verbose > 0:    
+        print(f'Total size of train set: {crash_df.shape[0]}')
+    train_score = score(train_placements_df,train_df,
+                        test_start_date=test_period_date_start, test_end_date=test_period_date_end)
+    if verbose > 0:    
+        print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')
+    if verbose > 0:    
+        print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
+
+    # Create file for submitting to zindi
+    submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
+                                           tw_cluster_strategy=tw_cluster_strategy)
+    create_submission_csv(submission_df, crash_source='prediction', outlier_filter=outlier_filter,
+                          tw_cluster_strategy=tw_cluster_strategy, placement_method=placement_method, path='../Outputs/' ,verbose=verbose)
+
+    
+    
