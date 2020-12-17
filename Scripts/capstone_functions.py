@@ -792,6 +792,8 @@ def import_uber_data():
     df_hexclusters['cluster_id'] = df_hexclusters['cluster_id'].astype('int')
     df_hexclusters = assign_hex_bin(df_hexclusters, 'latitude', 'longitude')
     
+    h3res = h3.h3_get_resolution(df_hexclusters.loc[0, 'h3_zone_6'])
+    
     # Read the travel times for weekdays
     df_tt_hourly_wd = pd.read_csv('../Inputs/nairobi-hexclusters-2018-3-OnlyWeekdays-HourlyAggregate.csv')
     
@@ -801,6 +803,12 @@ def import_uber_data():
     df_combined_wd.drop(['cluster_id'], axis=1, inplace=True)
     df_combined_wd = df_combined_wd.merge(df_hexclusters, how='left', left_on='dstid', right_on='cluster_id', suffixes=('_source', '_dst'))
     df_combined_wd.drop(['cluster_id'], axis=1, inplace=True)
+    df_combined_wd['dist_air'] = df_combined_wd[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
+    df_combined_wd['avg_speed'] = df_combined_wd['dist_air'] / df_combined_wd['mean_travel_time'] * 3600
+    
+    # Get average speeds per hour
+    global avg_speeds_wd
+    avg_speeds_wd = df_combined_wd.groupby('hod').mean()['avg_speed']
     
     # Read the travel times for weekends
     df_tt_hourly_we = pd.read_csv('../Inputs/nairobi-hexclusters-2018-3-OnlyWeekends-HourlyAggregate.csv')
@@ -811,6 +819,12 @@ def import_uber_data():
     df_combined_we.drop(['cluster_id'], axis=1, inplace=True)
     df_combined_we = df_combined_we.merge(df_hexclusters, how='left', left_on='dstid', right_on='cluster_id', suffixes=('_source', '_dst'))
     df_combined_we.drop(['cluster_id'], axis=1, inplace=True)
+    df_combined_we['dist_air'] = df_combined_we[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
+    df_combined_we['avg_speed'] = df_combined_we['dist_air'] / df_combined_we['mean_travel_time'] * 3600
+    
+    # Get average speeds per hour
+    global avg_speeds_we
+    avg_speeds_we = df_combined_we.groupby('hod').mean()['avg_speed']
 
 
 
@@ -921,87 +935,16 @@ def get_distance_time(lat_src, long_src, lat_dst, long_dst, weekend, hour, h3res
     if len(travel_times) > 0:
         travel_time = sum(travel_times) / len(travel_times) / 60
     else:
-        #print('Not in Uber movement data.')
         # len(travel_times) == 0 means that no travel times exist for this connection in the Uber movement data
-        # Create list of closest hex-bin clusters to source
-        if weekend == 1:
-            valid_src = df_combined_we['h3_zone_6_source'].unique()
-        else:
-            valid_src = df_combined_wd['h3_zone_6_source'].unique()
-        
-        closest_hex_src = [(h3.geo_to_h3(lat_src, long_src, h3res), 0)]
-        for src in valid_src:
-            lat = h3.h3_to_geo(src)[0]
-            long = h3.h3_to_geo(src)[1]
-            dist = get_distance_air(lat_src, long_src, lat, long, h3res)
-            closest_hex_src.append((src, dist))
-        closest_hex_src.sort(key=lambda tup: tup[1])
-        
-        # Create list of closest hex-bin clusters to destination
-        if weekend == 1:
-            valid_dst = df_combined_we['h3_zone_6_dst'].unique()
-        else:
-            valid_dst = df_combined_wd['h3_zone_6_dst'].unique()
-        
-        closest_hex_dst = [(h3.geo_to_h3(lat_dst, long_dst, h3res), 0)]
-        for dst in valid_dst:
-            lat = h3.h3_to_geo(dst)[0]
-            long = h3.h3_to_geo(dst)[1]
-            dist = get_distance_air(lat_dst, long_dst, lat, long, h3res)
-            closest_hex_dst.append((dst, dist))
-        closest_hex_dst.sort(key=lambda tup: tup[1])
-        
-        # Run through the closest clusters and check if there is connection between them
-        i_src = 0
-        i_dst = 0
-        if (closest_hex_src[1][1] - closest_hex_src[0][1]) > (closest_hex_dst[1][1] - closest_hex_dst[0][1]):
-            i_src += 1
-            switcher = 1
-        else:
-            i_dst += 1
-            switcher = 0
-        looking = True
-        
-        while looking:
-            if weekend == 1:
-                alt_times = df_combined_we[(df_combined_we['h3_zone_6_source'] == closest_hex_src[i_src][0]) & \
-                                           (df_combined_we['h3_zone_6_dst'] == closest_hex_dst[i_dst][0]) & \
-                                           (df_combined_we['hod'] == hour) \
-                                          ]['mean_travel_time']
-            else:
-                alt_times = df_combined_wd[(df_combined_wd['h3_zone_6_source'] == closest_hex_src[i_src][0]) & \
-                                           (df_combined_wd['h3_zone_6_dst'] == closest_hex_dst[i_dst][0]) & \
-                                           (df_combined_wd['hod'] == hour) \
-                                          ]['mean_travel_time']
-            
-            if len(alt_times) > 0:
-                # Get average speed from this connection (based on air distance)
-                alt_lat_src = h3.h3_to_geo(closest_hex_src[i_src][0])[0]
-                alt_long_src = h3.h3_to_geo(closest_hex_src[i_src][0])[1]
-                alt_lat_dst = h3.h3_to_geo(closest_hex_dst[i_dst][0])[0]
-                alt_long_dst = h3.h3_to_geo(closest_hex_dst[i_dst][0])[1]
-                
-                alt_distance_air = get_distance_air(alt_lat_src, alt_long_src, alt_lat_dst, alt_long_dst, h3res)
-                #print('alt_distance_air:', alt_distance_air, 'km')
-                alt_time = sum(alt_times) / len(alt_times) / 60
-                #print('alt_time:', alt_time, 'min')
-                alt_speed = alt_distance_air / alt_time
-                #print('alt_speed:', alt_speed*60, 'km/h')
-                looking = False
-                
-            if switcher % 2 == 0:
-                i_src += 1
-            else:
-                i_dst += 1
-            switcher += 1
-        
         # Get air distance between two original coordinates
         orig_dist = get_distance_air(lat_src, long_src, lat_dst, long_dst, h3res)
-        #print('orig_dist:', orig_dist, 'km')
         
         # Divide air distance through average speed
-        travel_time = orig_dist / alt_speed
-    
+        if weekend == 1:
+            travel_time = orig_dist / avg_speeds_we[hour] * 60
+        else:
+            travel_time = orig_dist / avg_speeds_wd[hour] * 60
+            
     return travel_time
 
 
