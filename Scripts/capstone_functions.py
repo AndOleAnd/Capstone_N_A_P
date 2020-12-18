@@ -963,11 +963,8 @@ def score_adv(train_placements_df, crash_df, test_start_date='2018-01-01', test_
     
     try:
         df_combined_wd
-        print('Already imported Uber data')
     except NameError:
-        print('Importing Uber data')
         import_uber_data()
-        print('Importing complete')
         
     test_df = crash_df.loc[(crash_df.datetime >= test_start_date) & (crash_df.datetime <= test_end_date)]
     if verbose > 0:    
