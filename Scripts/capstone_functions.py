@@ -803,12 +803,14 @@ def import_uber_data():
     df_combined_wd.drop(['cluster_id'], axis=1, inplace=True)
     df_combined_wd = df_combined_wd.merge(df_hexclusters, how='left', left_on='dstid', right_on='cluster_id', suffixes=('_source', '_dst'))
     df_combined_wd.drop(['cluster_id'], axis=1, inplace=True)
-    df_combined_wd['dist_air'] = df_combined_wd[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
-    df_combined_wd['avg_speed'] = df_combined_wd['dist_air'] / df_combined_wd['mean_travel_time'] * 3600
+    #df_combined_wd['dist_air'] = df_combined_wd[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
+    #df_combined_wd['avg_speed'] = df_combined_wd['dist_air'] / df_combined_wd['mean_travel_time'] * 3600
     
     # Get average speeds per hour
     global avg_speeds_wd
-    avg_speeds_wd = df_combined_wd.groupby('hod').mean()['avg_speed']
+    #avg_speeds_wd = df_combined_wd.groupby('hod').mean()['avg_speed']
+    avg_speeds_wd = [32.309, 31.931, 33.079, 33.651, 32.329, 30.146, 25.374, 23.388, 24.028, 24.589, 23.937, 23.609,
+                     23.485, 23.755, 23.506, 22.334, 20.371, 18.948, 20.007, 21.896, 25.091, 28.293, 29.963, 29.516]
     
     # Read the travel times for weekends
     df_tt_hourly_we = pd.read_csv('../Inputs/nairobi-hexclusters-2018-3-OnlyWeekends-HourlyAggregate.csv')
@@ -819,12 +821,14 @@ def import_uber_data():
     df_combined_we.drop(['cluster_id'], axis=1, inplace=True)
     df_combined_we = df_combined_we.merge(df_hexclusters, how='left', left_on='dstid', right_on='cluster_id', suffixes=('_source', '_dst'))
     df_combined_we.drop(['cluster_id'], axis=1, inplace=True)
-    df_combined_we['dist_air'] = df_combined_we[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
-    df_combined_we['avg_speed'] = df_combined_we['dist_air'] / df_combined_we['mean_travel_time'] * 3600
+    #df_combined_we['dist_air'] = df_combined_we[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
+    #df_combined_we['avg_speed'] = df_combined_we['dist_air'] / df_combined_we['mean_travel_time'] * 3600
     
     # Get average speeds per hour
     global avg_speeds_we
-    avg_speeds_we = df_combined_we.groupby('hod').mean()['avg_speed']
+    #avg_speeds_we = df_combined_we.groupby('hod').mean()['avg_speed']
+    avg_speeds_we = [30.955, 31.295, 31.420, 31.653, 31.033, 30.927, 33.035, 31.679, 28.906, 26.834, 25.684, 24.879,
+                     24.587, 23.887, 23.518, 24.960, 25.638, 26.112, 24.846, 23.837, 26.140, 28.012, 29.391, 29.532]
 
 
 
@@ -957,9 +961,14 @@ def score_adv(train_placements_df, crash_df, test_start_date='2018-01-01', test_
     Can be used on all crash data, train_df or holdout_df as crash_df.
     '''
     
-    if 'df_combined_wd' not in locals():
+    try:
+        df_combined_wd
+        print('Already imported Uber data')
+    except NameError:
+        print('Importing Uber data')
         import_uber_data()
-    
+        print('Importing complete')
+        
     test_df = crash_df.loc[(crash_df.datetime >= test_start_date) & (crash_df.datetime <= test_end_date)]
     if verbose > 0:    
         print(f'Data points in test period: {test_df.shape[0]}' )
@@ -1027,31 +1036,28 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     
     # Run scoring functions
     # If using score
-    if verbose == 1:    
+    if verbose > 0:    
         print(f'Total size of test set: {test_df.shape[0]}')
     test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
                        test_end_date=test_period_date_end)
-    if verbose == 1:    
+    if verbose > 0:    
         print(f'Total size of train set: {crash_df.shape[0]}')
     train_score = score(train_placements_df,train_df,
                         test_start_date=test_period_date_start, test_end_date=test_period_date_end)
     
-    if verbose == 1:
+    if verbose > 0:
         print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')   
         print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
     
     
     # If using score_adv:
-    if verbose == 2:    
-        print(f'Total size of test set: {test_df.shape[0]}')
-    test_score = score_adv(train_placements_df, test_df, test_start_date=test_period_date_start,
-                       test_end_date=test_period_date_end)
-    if verbose == 2:    
-        print(f'Total size of train set: {crash_df.shape[0]}')
-    train_score = score_adv(train_placements_df,train_df,
-                        test_start_date=test_period_date_start, test_end_date=test_period_date_end)
-    
     if verbose == 2:
+        test_score = score_adv(train_placements_df, test_df, test_start_date=test_period_date_start,
+                               test_end_date=test_period_date_end)
+        
+        train_score = score_adv(train_placements_df,train_df,
+                                test_start_date=test_period_date_start, test_end_date=test_period_date_end)
+        
         for x in test_score:
             test_score[x] = test_score[x] / max(test_df.shape[0],1)
         print(f'Score on test set: {test_score}')
