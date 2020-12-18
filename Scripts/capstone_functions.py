@@ -120,20 +120,15 @@ def scale_pca_weather(df_combined):
     
     return df_combined_pca
 
-
-
-def split_combined(df_combined_pca):
-    X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
-    y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)]["accidents"]
-    X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 7, 1)) & (df_combined_pca["date"] < dt.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
-    
-    return X_train, X_test, y_train
-
-def split_combined_first_half_2019(df_combined_pca):
-    X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
-    y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)]["accidents"]
-    X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 1, 1)) & (df_combined_pca["date"] < dt.date(2019, 7, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
-    
+def split_combined(df_combined_pca, predict_period='2019_h2'):
+    if predict_period == '2019_h1':
+        X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+        y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 1, 1)]["accidents"]
+        X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 1, 1)) & (df_combined_pca["date"] < dt.date(2019, 7, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
+    elif predict_period == '2019_h2':
+        X_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)][[0, 1, 2, 3, 4, "sun_holiday"]]
+        y_train = df_combined_pca[df_combined_pca["date"] < dt.date(2019, 7, 1)]["accidents"]
+        X_test = df_combined_pca[(df_combined_pca["date"] >= dt.date(2019, 7, 1)) & (df_combined_pca["date"] < dt.date(2020, 1, 1))][[0, 1, 2, 3, 4, "sun_holiday"]]
     return X_train, X_test, y_train
 
 
@@ -147,30 +142,18 @@ def predict_poly(X_train, X_test, y_train):
     return lin_poly.predict(X_test_poly)
     
 
-def predict_accidents_on_weather_first_half_2019(df_accident, df_weather):
+def predict_accidents_on_weather(df_accident, df_weather, predict_period='2019_h1'):
     '''
-    Takes the raw data and returns the number of predicted road traffic accidents for every day in the second half of 2019.
-    '''
-    
-    df_weather = clean_weather_data(df_weather)
-    df_weather = add_weather_change(df_weather)
-    df_combined = join_accident_to_weather(df_accident, df_weather)
-    df_combined_pca = scale_pca_weather(df_combined)
-    X_train, X_test, y_train = split_combined_first_half_2019(df_combined_pca)
-    y_pred = predict_poly(X_train, X_test, y_train)
-    y_pred = [0 if i < 0 else i for i in y_pred]
-    return y_pred
-
-def predict_accidents_on_weather(df_accident, df_weather):
-    '''
-    Takes the raw data and returns the number of predicted road traffic accidents for every day in the second half of 2019.
+    Takes the raw data and returns the number of predicted road traffic accidents for every day in the predict period:
+    First half 2019 : (predict_period='2019_h1') 
+    Second half of 2019 : (predict_period='2019_h2') 
     '''
     
     df_weather = clean_weather_data(df_weather)
     df_weather = add_weather_change(df_weather)
     df_combined = join_accident_to_weather(df_accident, df_weather)
     df_combined_pca = scale_pca_weather(df_combined)
-    X_train, X_test, y_train = split_combined(df_combined_pca)
+    X_train, X_test, y_train = split_combined(df_combined_pca, predict_period=predict_period)
     y_pred = predict_poly(X_train, X_test, y_train)
     y_pred = [0 if i < 0 else i for i in y_pred]
     return y_pred
@@ -515,17 +498,16 @@ def assign_TW_cluster(weekday, time_window, holiday=0, strategy='baseline'):
     # no_cluster returns a individual cluster name for each weekday, time window and holiday combination
     elif strategy == 'no_cluster':
         return (str(weekday)+str(time_window)+str(holiday))
+    
+    elif strategy == 'time_window':
+        return time_window
             
 def create_cluster_feature(crash_df, strategy='baseline', verbose=0):
     '''
     Function takes crash df and creates new column with tw cluster labels.
     If verbose is increased, the time window clusters will be visualised.
     '''
-    crash_df["cluster"] = crash_df.apply(lambda x: 
-                                         assign_TW_cluster(weekday=x.weekday,
-                                                           time_window=x.time_window_str,
-                                                           strategy=strategy) 
-                                         ,axis=1)
+    crash_df['cluster'] = crash_df.apply(lambda x: assign_TW_cluster(weekday=x.weekday, time_window=x.time_window_str, strategy=strategy) ,axis=1)
     if verbose > 0:    
         print(f'{crash_df.cluster.nunique()} clusters created')
     if verbose > 1:
@@ -537,27 +519,6 @@ def create_cluster_feature(crash_df, strategy='baseline', verbose=0):
     return crash_df
             
 
-def create_baseline_submission_df(crash_data_df, date_start='2019-07-01', date_end='2020-01-01'):
-    '''Takes crash data and creates star shaped placement set, outputs a data frame in the format needed for submission'''
-       
-    # star grid
-    lat_centroid = list(crash_data_df.latitude.quantile(q=[1/5,2/5,3/5,4/5]))
-    lon_centroid = list(crash_data_df.longitude.quantile(q=[1/4,2/4,3/4]))
-    centroids=[(lat_centroid[1],lon_centroid[0]),(lat_centroid[2],lon_centroid[0]),
-               (lat_centroid[0],lon_centroid[1]),(lat_centroid[3],lon_centroid[1]),
-               (lat_centroid[1],lon_centroid[2]),(lat_centroid[2],lon_centroid[2])]
-    
-    # Create Date range covering submission period set
-    dates = pd.date_range(date_start, date_end, freq='3h')
-        
-    # Create submission dataframe
-    submission_df = pd.DataFrame({'date':dates})
-    for ambulance in range(6):
-        # Place an ambulance in the center of the city:
-        submission_df['A'+str(ambulance)+'_Latitude'] = centroids[ambulance][0]
-        submission_df['A'+str(ambulance)+'_Longitude'] = centroids[ambulance][1]
-    return submission_df, centroids
-
 def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='k_means', lr=3e-2, n_epochs=400, batch_size=50):
     if method == 'k_means':
         centroids_dict = create_k_means_centroids(crash_df_with_cluster, verbose=verbose)
@@ -568,9 +529,32 @@ def create_cluster_centroids(crash_df_with_cluster, test_df, verbose=0, method='
                                                            lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     elif method == 'k_medoids':
         centroids_dict = create_k_medoids_centroids(crash_df_with_cluster, verbose=verbose)
+    
+    elif method == 'baseline':
+        centroids_dict = create_baseline_centroids(crash_df_with_cluster, verbose=verbose)
+    
     if verbose > 0:    
         print(f'{len(centroids_dict)} placement sets created')
+    
     return centroids_dict
+    
+
+def create_baseline_centroids(crash_df_with_cluster, verbose=0):
+    if verbose > 0:    
+        print('using star grid for placement')
+    centroids_dict = {}
+    for i in crash_df_with_cluster.cluster.unique():
+        data_slice = crash_df_with_cluster.query('cluster==@i')
+        lat_centroid = list(data_slice.latitude.quantile(q=[1/5,2/5,3/5,4/5]))
+        lon_centroid = list(data_slice.longitude.quantile(q=[1/4,2/4,3/4]))
+        centroids=[(lat_centroid[1],lon_centroid[0]),(lat_centroid[2],lon_centroid[0]),
+               (lat_centroid[0],lon_centroid[1]),(lat_centroid[3],lon_centroid[1]),
+               (lat_centroid[1],lon_centroid[2]),(lat_centroid[2],lon_centroid[2])]
+        centroids_dict[i] = np.array(centroids).flatten()          
+        if verbose > 5:
+            print(centroids)
+    return centroids_dict
+
     
 def create_k_means_centroids(crash_df_with_cluster, verbose=0):
     if verbose > 0:    
@@ -745,7 +729,8 @@ def create_submission_csv(submission_df, crash_source, outlier_filter, tw_cluste
 def score(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_date='2019-12-31', verbose=0):
           
     '''
-    Can be used to score the ambulance placements against a set of crashes. Can be used on all crash data, train_df or holdout_df as crash_df.
+    Can be used to score the ambulance placements against a set of crashes. 
+    Can be used on all crash data, train_df or holdout_df as crash_df.
     '''
     test_df = crash_df.loc[(crash_df.datetime >= test_start_date) & (crash_df.datetime <= test_end_date)]
     if verbose > 0:    
@@ -992,25 +977,21 @@ def score_adv(train_placements_df, crash_df, test_start_date='2018-01-01', test_
 
 
 def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/', crash_source_csv='Train',
-                                 outlier_filter=0,
-                                 holdout_strategy='year_2019', holdout_test_size=0.3,
+                                 outlier_filter=0, holdout_strategy='random', holdout_test_size=0.3,
                                  test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
                                  tw_cluster_strategy='saturday_2', placement_method='k_means', verbose=0,
                                  lr=3e-2, n_epochs=400, batch_size=50):  
     '''
     load crash data (from train or prediction) and apply feautre engineering, run tw clustering (based on strategy choice) 
     create ambulance placements, create output file.
-    placement_model has no impact on functions but is used to add info to output file
     '''
     # load crash data into dataframe
     crash_df = create_crash_df(train_file = input_path+crash_source_csv+'.csv')
-    
     # in case of loading file with hex bins instead of lat/long
     if 'latitude' not in crash_df.columns:
         crash_df['latitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[0])
         crash_df['longitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[1])  
-        crash_df = crash_df.drop("hex_bin", axis=1)
-
+        crash_df.drop("hex_bins", axis=1, inplace=True)
     # create individual date and time features from date column
     crash_df = create_temporal_features(crash_df)
     # split data into train and test sets
@@ -1026,7 +1007,6 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
     centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters, verbose=verbose, method=placement_method,
                                              lr=lr, n_epochs=n_epochs, batch_size=batch_size)
     
-
     # create df in format needed for submission
     train_placements_df = centroid_to_submission(centroids_dict, date_start='2018-01-01', date_end='2019-12-31',
                                                  tw_cluster_strategy=tw_cluster_strategy)
@@ -1385,13 +1365,16 @@ def generate_predictions_first_half_2019(df, predicted_rta):
     
     return df_pred_c
 
-def reduce_to_time_windows(df):
+def reduce_to_time_windows(df, predict_period):
     """
     Takes a data frame of predicted RTA's and brings it into the correct format for clustering.
     """
     
     # Set start of prediction period
-    start = pd.to_datetime("2019-07-01")
+    if predict_period == '2019_h2':
+        start = pd.to_datetime("2019-07-01")
+    if predict_period == '2019_h1':
+        start = pd.to_datetime("2019-01-01")
     
     # Creates a datetime column that counts the days upwards and then sets all entries to the starting day, 2019-07-01, plus that day
     df["help"] = (df["week"]) * 7 + df["weekday"]
@@ -1405,10 +1388,15 @@ def reduce_to_time_windows(df):
     df.loc[df["time_window"] == "12-15", "datetime"] = df["datetime"] + pd.Timedelta(hours=12, minutes=1)
     df.loc[df["time_window"] == "15-18", "datetime"] = df["datetime"] + pd.Timedelta(hours=15, minutes=1)
     df.loc[df["time_window"] == "18-21", "datetime"] = df["datetime"] + pd.Timedelta(hours=18, minutes=1)
-    df.loc[df["time_window"] == "21-00", "datetime"] = df["datetime"] + pd.Timedelta(hours=21, minutes=1)
+    df.loc[df["time_window"] == "21-24", "datetime"] = df["datetime"] + pd.Timedelta(hours=21, minutes=1)
     
     # Remove redundant columns
     df_pred_c_clean = df.drop(["time_window", "weekday", "week", "help"], axis=1)
+    
+    df_pred_c_clean = df_pred_c_clean.sort_values(by="datetime")
+    
+    if predict_period=="2019_h1":
+        df_pred_c_clean = df_pred_c_clean.loc[df_pred_c_clean["datetime"] < "2019-7-1"]
     
     return df_pred_c_clean
 
@@ -1420,7 +1408,7 @@ def export_df_to_csv(df,path_file='../Inputs/train_h3.csv'):
     df.to_csv(path_file,index=False)
     print(f'file created {path_file}') 
 
-def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1):
+def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1, predict_period='2019_h1'):
     """
     Choose type of prediction:
         - 'a' for a simple frequency outlier removal based on parameter 'frequency_cutoff'. Outputs data for 2018-01-01 to 2019-06-30.
@@ -1468,13 +1456,15 @@ def rta_prediction_pipeline(type_of_pred="a", frequency_cutoff=1):
         df_weather = pd.read_csv('../Inputs/Weather_Nairobi_Daily_GFS.csv', parse_dates=['Date'])
         df_raw = create_crash_df()
         
-        predicted_rta = predict_accidents_on_weather(df_raw, df_weather)
+        predicted_rta = predict_accidents_on_weather(df_raw, df_weather, predict_period=predict_period)
         predicted_rta_round = [int(round(i, 0)) for i in predicted_rta]
         #predicted_rta = predict_accidents_on_weather(df_raw, df_weather)
+        if predict_period == '2019_h2':
+            df_pred_c = generate_predictions(df_samples, predicted_rta_round)
+        elif predict_period == '2019_h1':
+            df_pred_c = generate_predictions_first_half_2019(df_samples, predicted_rta_round)
         
-        df_pred_c = generate_predictions(df_samples, predicted_rta_round)
-        
-        df_pred_c_clean = reduce_to_time_windows(df_pred_c)
+        df_pred_c_clean = reduce_to_time_windows(df_pred_c, predict_period)
         
         export_df_to_csv(df_pred_c_clean,path_file='../Inputs/predictions_for_clustering_c.csv')
         
@@ -1489,3 +1479,66 @@ ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/',
                              tw_cluster_strategy='holiday_simple', placement_method='gradient_descent', verbose=0,
                              lr=3e-3, n_epochs=400)
 '''
+
+
+def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0, 
+                  test_period_date_start='2019-07-01', test_period_date_end='2019-12-01',
+                  tw_cluster_strategy='baseline', placement_method='k_means', verbose=0,
+                  lr=3e-2, n_epochs=400, batch_size=50):  
+    '''
+    load crash data (from prediction) and apply feautre engineering, 
+    run tw clustering (based on strategy choice) 
+    create ambulance placements, create output file.
+    '''
+    
+    # load predicted crash data into dataframe
+    crash_df = rta_prediction_pipeline(type_of_pred="c", frequency_cutoff=frequency_cutoff, predict_period=predict_period)
+    # in case of loading file with hex bins instead of lat/long
+    if 'latitude' not in crash_df.columns:
+        crash_df['latitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[0])
+        crash_df['longitude'] = crash_df.hex_bins.apply(lambda x : h3.h3_to_geo(x)[1])  
+        crash_df.drop("hex_bins", axis=1, inplace=True)
+    
+    # create train dataset from predictions for 2019
+    crash_df = create_temporal_features(crash_df)
+    train_df = crash_df
+    # create test dataset from actual 2019
+    test_df = create_crash_df(train_file = '../Inputs/Train.csv')
+    test_df = test_df.loc[test_df["datetime"] >= "2019-01-01"]
+    test_df = create_temporal_features(test_df)
+    
+    # remove outliers from test set based on lat and lon
+    train_df = outlier_removal(train_df, filter=outlier_filter)
+    # apply time window cluster labels to df based on strategy specified
+    train_df = create_cluster_feature(train_df, strategy=tw_cluster_strategy, verbose=verbose)
+
+    # Run clustering model to get placement set centroids for each TW cluster
+    test_df_with_clusters = create_cluster_feature(test_df, strategy=tw_cluster_strategy, verbose=0)
+    centroids_dict = create_cluster_centroids(train_df, test_df=test_df_with_clusters,
+                                              verbose=verbose, method=placement_method,
+                                              lr=lr, n_epochs=n_epochs, batch_size=batch_size)
+    
+    # create df in format needed for submission
+    train_placements_df = centroid_to_submission(centroids_dict, date_start='2019-01-01', date_end='2020-01-01',
+                                                 tw_cluster_strategy=tw_cluster_strategy)
+    # Run scoring functions
+    if verbose > 0:    
+        print(f'Total size of test set: {test_df.shape[0]}') 
+        print(f'Total size of train set: {crash_df.shape[0]}')
+    test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
+                       test_end_date=test_period_date_end)
+    train_score = score(train_placements_df,train_df,
+                        test_start_date=test_period_date_start, test_end_date=test_period_date_end)
+    if verbose > 0:    
+        print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')  
+        print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
+
+    # Create df for submitting to zindi
+    submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
+                                           tw_cluster_strategy=tw_cluster_strategy)
+    # Create file for submitting to zindi
+    create_submission_csv(submission_df, crash_source='prediction', outlier_filter=outlier_filter,
+                          tw_cluster_strategy=tw_cluster_strategy, placement_method=placement_method, path='../Outputs/' ,verbose=verbose)
+
+    
+    
