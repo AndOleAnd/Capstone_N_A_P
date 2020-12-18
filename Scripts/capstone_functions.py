@@ -746,7 +746,7 @@ def score(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_
 
 
 def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/', crash_source_csv='Train',
-                                 outlier_filter=0, holdout_strategy='year_2019', holdout_test_size=0.3,
+                                 outlier_filter=0, holdout_strategy='random', holdout_test_size=0.3,
                                  test_period_date_start='2019-01-01', test_period_date_end='2019-07-01',
                                  tw_cluster_strategy='saturday_2', placement_method='k_means', verbose=0,
                                  lr=3e-2, n_epochs=400, batch_size=50):  
