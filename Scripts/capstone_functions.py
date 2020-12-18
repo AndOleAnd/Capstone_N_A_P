@@ -19,6 +19,8 @@ import scipy.cluster.hierarchy as sch
 import holidays
 from fastai.vision.all import * # Needs latest version, and sometimes a restart of the runtime after the pip installs
 from sklearn_extra.cluster import KMedoids
+import json
+from geopy.distance import geodesic
 
 
 
@@ -760,6 +762,235 @@ def score(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_
 
 
 
+def import_uber_data():
+    '''Imports the hourly travel times from Uber movement data.
+    In addition, the hexlusters used by Uber in Nairobi are imported. '''
+    
+    # Read the JSON file with the hexclusters
+    file = open('../Inputs/540_hexclusters.json',)
+    hexclusters = json.load(file)
+    file.close()
+    
+    # Find the centroids of the hexbin clusters
+    cluster_id = []
+    longitude = []
+    latitude = []
+    for i in range(len(hexclusters['features'])):
+        coords = hexclusters['features'][i]['geometry']['coordinates'][0]
+        x = [long for long, lat in coords]
+        y = [lat for long, lat in coords]
+        x_c = sum(x) / len(x)
+        y_c = sum(y) / len(y)
+        cluster_id.append(hexclusters['features'][i]['properties']['MOVEMENT_ID'])
+        longitude.append(x_c)
+        latitude.append(y_c)
+    
+    # Create DataFrame with hexcluster ids and the lat and long values of the centroids
+    global df_hexclusters
+    df_hexclusters = pd.DataFrame([cluster_id, longitude, latitude]).transpose()
+    df_hexclusters.columns = ['cluster_id', 'longitude', 'latitude']
+    df_hexclusters['cluster_id'] = df_hexclusters['cluster_id'].astype('int')
+    df_hexclusters = assign_hex_bin(df_hexclusters, 'latitude', 'longitude')
+    
+    h3res = h3.h3_get_resolution(df_hexclusters.loc[0, 'h3_zone_6'])
+    
+    # Read the travel times for weekdays
+    df_tt_hourly_wd = pd.read_csv('../Inputs/nairobi-hexclusters-2018-3-OnlyWeekdays-HourlyAggregate.csv')
+    
+    # Add lat and long values to the tavel time data
+    global df_combined_wd
+    df_combined_wd = df_tt_hourly_wd.merge(df_hexclusters, how='left', left_on='sourceid', right_on='cluster_id')
+    df_combined_wd.drop(['cluster_id'], axis=1, inplace=True)
+    df_combined_wd = df_combined_wd.merge(df_hexclusters, how='left', left_on='dstid', right_on='cluster_id', suffixes=('_source', '_dst'))
+    df_combined_wd.drop(['cluster_id'], axis=1, inplace=True)
+    #df_combined_wd['dist_air'] = df_combined_wd[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
+    #df_combined_wd['avg_speed'] = df_combined_wd['dist_air'] / df_combined_wd['mean_travel_time'] * 3600
+    
+    # Get average speeds per hour
+    global avg_speeds_wd
+    #avg_speeds_wd = df_combined_wd.groupby('hod').mean()['avg_speed']
+    avg_speeds_wd = [32.309, 31.931, 33.079, 33.651, 32.329, 30.146, 25.374, 23.388, 24.028, 24.589, 23.937, 23.609,
+                     23.485, 23.755, 23.506, 22.334, 20.371, 18.948, 20.007, 21.896, 25.091, 28.293, 29.963, 29.516]
+    
+    # Read the travel times for weekends
+    df_tt_hourly_we = pd.read_csv('../Inputs/nairobi-hexclusters-2018-3-OnlyWeekends-HourlyAggregate.csv')
+    
+    # Add lat and long values to the tavel time data
+    global df_combined_we
+    df_combined_we = df_tt_hourly_we.merge(df_hexclusters, how='left', left_on='sourceid', right_on='cluster_id')
+    df_combined_we.drop(['cluster_id'], axis=1, inplace=True)
+    df_combined_we = df_combined_we.merge(df_hexclusters, how='left', left_on='dstid', right_on='cluster_id', suffixes=('_source', '_dst'))
+    df_combined_we.drop(['cluster_id'], axis=1, inplace=True)
+    #df_combined_we['dist_air'] = df_combined_we[['latitude_source', 'longitude_source', 'latitude_dst', 'longitude_dst']].apply(lambda x: get_distance_air(x.latitude_source, x.longitude_source, x.latitude_dst, x.longitude_dst, h3res), axis=1)
+    #df_combined_we['avg_speed'] = df_combined_we['dist_air'] / df_combined_we['mean_travel_time'] * 3600
+    
+    # Get average speeds per hour
+    global avg_speeds_we
+    #avg_speeds_we = df_combined_we.groupby('hod').mean()['avg_speed']
+    avg_speeds_we = [30.955, 31.295, 31.420, 31.653, 31.033, 30.927, 33.035, 31.679, 28.906, 26.834, 25.684, 24.879,
+                     24.587, 23.887, 23.518, 24.960, 25.638, 26.112, 24.846, 23.837, 26.140, 28.012, 29.391, 29.532]
+
+
+
+def get_metrics(coord_src, coord_dst, weekend, hour):
+    '''
+    Inputs:
+    * coord_src: H3 hexbin or coordinate as list or tuple of the origin of the trip
+    * coord_dst: H3 hexbin or coordinate as list or tuple of the destination of the trip
+    * weekend:   1 if weekend, 0 if weekday
+    * hour:      Hour of the day as integer
+    
+    Output: Returns a list with the five levels of metics:
+    * Zindi: Euklidean distance between latitude and longitude values (Zindi challenge)
+    * Air: Air distance in kilometers
+    * Road: Road distance in kilometers
+    * Time: Driving distance in minutes
+    * Golden: Binary value: False if driving distance below threshold ("Golden Hour"), True if above
+    '''
+    
+    if type(coord_src) == str:
+        lat_src = h3.h3_to_geo(coord_src)[0]
+        long_src = h3.h3_to_geo(coord_src)[1]
+        h3res = h3.h3_get_resolution(coord_src)
+    elif type(coord_src) == list or tuple:
+        lat_src = coord_src[0]
+        long_src = coord_src[1]
+        h3res = 0
+    
+    if type(coord_dst) == str:
+        lat_dst = h3.h3_to_geo(coord_dst)[0]
+        long_dst = h3.h3_to_geo(coord_dst)[1]
+    elif type(coord_dst) == list or tuple:
+        lat_dst = coord_dst[0]
+        long_dst = coord_dst[1]
+        
+    metric = {}
+    
+    # Zindi score
+    metric['Zindi'] = get_distance_zindi(lat_src, long_src, lat_dst, long_dst)
+    
+    # Air distance
+    distance_air = get_distance_air(lat_src, long_src, lat_dst, long_dst, h3res)
+    metric['Air'] = distance_air
+    
+    # Approximated road distance
+    detour_coef = 1.3   # Known as Henning- or Hanno-coefficient
+    metric['Road'] = distance_air * detour_coef
+    
+    # Travel time from Uber movement data
+    travel_time = get_distance_time(lat_src, long_src, lat_dst, long_dst, weekend, hour, h3res)
+    metric['Time'] = travel_time
+    
+    # 'Golden hour'-threshold classification
+    golden_hour = 60   # Minutes
+    metric['Golden'] = travel_time > golden_hour
+    
+    return metric
+
+
+
+def get_distance_zindi(lat_src, long_src, lat_dst, long_dst):
+    '''
+    Returns the Euklidean distance between latitude and longitude values like in the Zindi-score.
+    '''
+    
+    return ((lat_src - lat_dst)**2 + (long_src - long_dst)**2) ** 0.5
+
+
+
+def get_distance_air(lat_src, long_src, lat_dst, long_dst, h3res):
+    '''
+    Returns the Euklidean distance between two pairs of coordinates in km.
+    If a distance between two points within a single cluster has to be calculated,
+    the average distance of all possible distances within one cluster is returned.
+    '''
+    
+    distance_air = geodesic((lat_src, long_src), (lat_dst, long_dst)).km
+    
+    if distance_air == 0:
+        area = h3.hex_area(resolution = h3res)
+        radius = (area / math.pi) ** 0.5
+        distance_air = 128 / (45 * math.pi) * radius
+
+    return distance_air
+
+
+
+def get_distance_time(lat_src, long_src, lat_dst, long_dst, weekend, hour, h3res):
+    '''
+    Returns the time that is needed to cover the road distance between two pairs of coordinates in minutes based on the Uber movement data.
+    '''
+    
+    hex_src = h3.geo_to_h3(lat=lat_src, lng=long_src, resolution=h3res)
+    hex_dst = h3.geo_to_h3(lat=lat_dst, lng=long_dst, resolution=h3res)
+    
+    if weekend == 1:
+        travel_times = df_combined_we[(df_combined_we['h3_zone_6_source'] == hex_src) & \
+                                      (df_combined_we['h3_zone_6_dst'] == hex_dst) & \
+                                      (df_combined_we['hod'] == hour) \
+                                     ]['mean_travel_time']
+    else:
+        travel_times = df_combined_wd[(df_combined_wd['h3_zone_6_source'] == hex_src) & \
+                                      (df_combined_wd['h3_zone_6_dst'] == hex_dst) & \
+                                      (df_combined_wd['hod'] == hour) \
+                                     ]['mean_travel_time']
+    
+    
+    if len(travel_times) > 0:
+        travel_time = sum(travel_times) / len(travel_times) / 60
+    else:
+        # len(travel_times) == 0 means that no travel times exist for this connection in the Uber movement data
+        # Get air distance between two original coordinates
+        orig_dist = get_distance_air(lat_src, long_src, lat_dst, long_dst, h3res)
+        
+        # Divide air distance through average speed
+        if weekend == 1:
+            travel_time = orig_dist / avg_speeds_we[hour] * 60
+        else:
+            travel_time = orig_dist / avg_speeds_wd[hour] * 60
+            
+    return travel_time
+
+
+
+def score_adv(train_placements_df, crash_df, test_start_date='2018-01-01', test_end_date='2019-12-31', verbose=0):   
+    '''
+    Advanced version of the standard score function. Does return a dictionary with five entries.
+    First entry is the 'Zindi' score just like in the score function. The other values are 'Air', 'Road', 'Time' and 'Golden'.
+    Can be used to score the ambulance placements against a set of crashes.
+    Can be used on all crash data, train_df or holdout_df as crash_df.
+    '''
+    
+    try:
+        df_combined_wd
+    except NameError:
+        import_uber_data()
+        
+    test_df = crash_df.loc[(crash_df.datetime >= test_start_date) & (crash_df.datetime <= test_end_date)]
+    if verbose > 0:    
+        print(f'Data points in test period: {test_df.shape[0]}' )
+    total_distance = {'Zindi': 0, 'Air': 0, 'Road': 0, 'Time': 0, 'Golden': 0}
+    for crash_date, c_lat, c_lon in test_df[['datetime', 'latitude', 'longitude']].values:
+        row = train_placements_df.loc[train_placements_df.date < crash_date].tail(1)
+        if crash_date.weekday() in (6, 7):
+            weekend = 1
+        else:
+            weekend = 0
+        hour = crash_date.hour
+        dists = []
+        for a in range(6):
+            dist = get_metrics((row[f'A{a}_Latitude'].values[0], row[f'A{a}_Longitude'].values[0]), (c_lat, c_lon), weekend, hour)
+            dists.append(dist)
+        
+        min_dist = dists[np.argmin([x['Time'] for x in dists])]
+        
+        for x in total_distance:
+            total_distance[x] += min_dist[x]
+            
+    return total_distance
+
+
+
 def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Outputs/', crash_source_csv='Train',
                                  outlier_filter=0,
                                  holdout_strategy='year_2019', holdout_test_size=0.3,
@@ -801,6 +1032,7 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
                                                  tw_cluster_strategy=tw_cluster_strategy)
     
     # Run scoring functions
+    # If using score
     if verbose > 0:    
         print(f'Total size of test set: {test_df.shape[0]}')
     test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
@@ -809,10 +1041,28 @@ def ambulance_placement_pipeline(input_path='../Inputs/', output_path='../Output
         print(f'Total size of train set: {crash_df.shape[0]}')
     train_score = score(train_placements_df,train_df,
                         test_start_date=test_period_date_start, test_end_date=test_period_date_end)
-    if verbose > 0:    
-        print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')
-    if verbose > 0:    
+    
+    if verbose > 0:
+        print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')   
         print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
+    
+    
+    # If using score_adv:
+    if verbose == 2:
+        test_score = score_adv(train_placements_df, test_df, test_start_date=test_period_date_start,
+                               test_end_date=test_period_date_end)
+        
+        train_score = score_adv(train_placements_df,train_df,
+                                test_start_date=test_period_date_start, test_end_date=test_period_date_end)
+        
+        for x in test_score:
+            test_score[x] = test_score[x] / max(test_df.shape[0],1)
+        print(f'Score on test set: {test_score}')
+
+        for x in train_score:
+            train_score[x] = train_score[x] / max(train_df.shape[0],1)
+        print(f'Score on train set: {train_score} (avg distance per accident)')
+        
 
     # Create file for submitting to zindi
     submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
