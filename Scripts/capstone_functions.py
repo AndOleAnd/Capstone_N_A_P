@@ -1525,14 +1525,32 @@ def full_pipeline(frequency_cutoff=1, predict_period='2019_h1', outlier_filter=0
     if verbose > 0:    
         print(f'Total size of test set: {test_df.shape[0]}') 
         print(f'Total size of train set: {crash_df.shape[0]}')
-    test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
-                       test_end_date=test_period_date_end)
-    train_score = score(train_placements_df,train_df,
-                        test_start_date=test_period_date_start, test_end_date=test_period_date_end)
+        test_score = score(train_placements_df, test_df, test_start_date=test_period_date_start,
+                           test_end_date=test_period_date_end)
+        train_score = score(train_placements_df,train_df,
+                            test_start_date=test_period_date_start, test_end_date=test_period_date_end)
     if verbose > 0:    
         print(f'Score on test set: {test_score / max(test_df.shape[0],1)}')  
         print(f'Score on train set: {train_score / train_df.shape[0] } (avg distance per accident)')
 
+    # If using score_adv:
+    if verbose == 2:
+        test_score = score_adv(train_placements_df, test_df, test_start_date=test_period_date_start,
+                               test_end_date=test_period_date_end)
+        
+        train_score = score_adv(train_placements_df,train_df,
+                                test_start_date=test_period_date_start, test_end_date=test_period_date_end)
+        
+        for x in test_score:
+            test_score[x] = test_score[x] / max(test_df.shape[0],1)
+        print(f'Score on test set: {test_score}')
+
+        for x in train_score:
+            train_score[x] = train_score[x] / max(train_df.shape[0],1)
+        print(f'Score on train set: {train_score} (avg distance per accident)')        
+
+        
+        
     # Create df for submitting to zindi
     submission_df = centroid_to_submission(centroids_dict, date_start='2019-07-01', date_end='2020-01-01',
                                            tw_cluster_strategy=tw_cluster_strategy)
